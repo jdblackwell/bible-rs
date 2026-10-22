@@ -35,6 +35,20 @@ jobs:
       - name: Startup and scrolling under Xvfb (software OpenGL)
         run: RUNS=5 scripts/bench-startup.sh
 
+  objects:
+    name: Object specs · schema, verses and quotes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Site packages (the check uses ajv and the core's wasm from site/)
+        working-directory: site
+        run: npm ci
+      - name: objects/*.json against the KJV and BSB
+        run: node site/src/lib/objects/check.mjs
+
   ios:
     name: iOS · framework, simulator and device builds
     runs-on: macos-latest
