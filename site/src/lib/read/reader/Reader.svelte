@@ -135,8 +135,9 @@
 		const hasText = parallel ? app.loaded.has(translation) : app.content(translation, p.chapter) !== null;
 		const offset = p.verse && p.verse > 1 && hasText ? verseOffset(section, p.verse) : 0;
 		const target = contentTop(section) - top + offset;
-		// Near a chapter's end there may not be enough text below to scroll that far yet.
-		if (target > scroller.scrollHeight - scroller.clientHeight + 1 && last < CHAPTERS - 1) {
+		// Near a chapter's end there may not be enough text below to scroll that far yet. A live
+		// translation has just its one chapter: the scroll stops at its end.
+		if (!single && target > scroller.scrollHeight - scroller.clientHeight + 1 && last < CHAPTERS - 1) {
 			last++;
 			void tick().then(place);
 			return;
@@ -233,14 +234,15 @@
 		if (!el) return;
 		const r = (el.closest('.row') ?? el).getBoundingClientRect();
 		const target = scroller.scrollTop + r.top + a.frac * r.height - a.above - line;
-		// Chapters that got shorter (a translation without them) may leave too little text to
-		// scroll that far: add some, then place it.
-		if (target > scroller.scrollHeight - scroller.clientHeight + 1 && last < CHAPTERS - 1) {
+		// Chapters that got shorter (a translation without them, smaller text) may leave too little
+		// text to scroll that far: add some, then place it. A live translation has just its one
+		// chapter: the scroll stops at its end.
+		if (!single && target > scroller.scrollHeight - scroller.clientHeight + 1 && last < CHAPTERS - 1) {
 			last++;
 			void tick().then(restore);
 			return;
 		}
-		if (target < 0 && first > 0) {
+		if (!single && target < 0 && first > 0) {
 			first--;
 			void tick().then(restore);
 			return;

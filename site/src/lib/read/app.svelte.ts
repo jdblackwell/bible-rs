@@ -292,10 +292,13 @@ export class ReadApp {
 		return this.info(translation)?.imported ? '/read' : chapterPath(this.books, translation, index);
 	}
 
-	/** A book's page in the translation being read (a one-chapter book's is its chapter). */
+	/** A book's page in the translation being read (a one-chapter book's is its chapter, and so is
+	 *  any book's in a live translation, which has no book pages). */
 	bookHref(book: Book): string {
 		const t = this.settings.translation;
-		return book.chapters === 1 || this.info(t)?.imported ? this.chapterHref(book.firstChapter) : bookPath(t, book);
+		return book.chapters === 1 || this.info(t)?.imported || this.isLive(t)
+			? this.chapterHref(book.firstChapter)
+			: bookPath(t, book);
 	}
 
 	/** A result navigator shows under the toolbar while a search has results. */
