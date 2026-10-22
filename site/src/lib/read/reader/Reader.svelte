@@ -1,7 +1,8 @@
 <!--
 	The reading area: chapters one after another in a scroller, as on the Mac (reader/mod.rs).
 	Only the chapters around the reading position are in the page; more are added as it scrolls,
-	keeping what's on screen still. Clicking a verse selects it, shift-click extends, double-click
+	keeping what's on screen still. A translation read live (the NLT) holds one chapter, so with it
+	the page has just the chapter being read, ending in links to the chapters either side. Clicking a verse selects it, shift-click extends, double-click
 	writes a note, right-click opens the verse menu. Selecting text (dragging, or a long press and
 	its handles on a touch screen) chooses words to highlight, within one chapter.
 -->
@@ -10,6 +11,7 @@
 	import { getApp, refCmp, type ReaderHandle, type Words } from '../app.svelte';
 	import { CHAPTERS, chapterLabel, type TextSpan, type VerseRef } from '../core';
 	import Chapter from './Chapter.svelte';
+	import LiveNotice from './LiveNotice.svelte';
 	import Parallel, { type Column } from './Parallel.svelte';
 	import Scrollbar from './Scrollbar.svelte';
 
@@ -38,6 +40,9 @@
 	const typo = $derived(app.settings.typo);
 	const abbrev = $derived(app.info(translation)?.abbrev ?? translation.toUpperCase());
 	const ready = $derived(app.loaded.has(translation));
+	/** A translation read live is shown: one chapter at a time. */
+	const single = $derived(cols.some((id) => app.isLive(id)));
+	const live = $derived(cols.find((id) => app.isLive(id)));
 
 	let flash = $state<{ chapter: number; verse: number } | null>(null);
 	let flashTimer: ReturnType<typeof setTimeout> | undefined;
@@ -278,7 +283,7 @@
 	/** One step a frame: add a chapter where the text runs out, drop ones far away. */
 	async function step() {
 		frame = 0;
-		if (!scroller || !app.core || !ready || pending) return;
+		if (!scroller || !app.core || !ready || pending || single) return;
 		const vh = scroller.clientHeight;
 		const st = scroller.scrollTop;
 		const below = scroller.scrollHeight - (st + vh);
@@ -711,6 +716,19 @@
 		};
 	});
 
+	// A live translation: just the chapter being read, at the verse that was at the top.
+	$effect(() => {
+		if (!single) return;
+		const c = app.here.chapter;
+		untrack(() => {
+			if (first === c && last === c) return;
+			const verse = anchor?.chapter === c ? anchor.verse : app.here.verse;
+			first = c;
+			last = c;
+			void jump(c, verse > 1 ? verse : undefined, false);
+		});
+	});
+
 	// The core arriving fills in the neighbouring chapters.
 	$effect(() => {
 		if (ready && app.core) untrack(schedule);
@@ -739,6 +757,7 @@
 		role="document"
 	>
 		{#each indices as index (index)}
+			{#snippet footer()}<LiveNotice {index} />{/snippet}
 			{#if parallel}
 				<Parallel
 					{index}
@@ -750,6 +769,7 @@
 					redLetters={typo.redLetters}
 					verseNumbers={typo.verseNumbers}
 					anchors={index === app.here.chapter}
+					footer={live && app.verses(live, index)?.length ? footer : undefined}
 				/>
 			{:else}
 				<Chapter
@@ -765,6 +785,7 @@
 					redLetters={typo.redLetters}
 					justify={typo.justify}
 					anchors={index === app.here.chapter}
+					footer={live ? footer : undefined}
 				/>
 			{/if}
 		{/each}

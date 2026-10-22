@@ -4,6 +4,7 @@
 	design points at a 20 pt reading size, scaled by --u.
 -->
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import type { Block, ChapterContent, HighlightColor, Run, VerseMarks } from '../core';
 	import Icon from '../ui/Icon.svelte';
 	import { runClass, segments, washes, type Piece, type Wash } from './segments';
@@ -25,10 +26,25 @@
 		justify: boolean;
 		/** The chapter in the address: its verses are the targets of #v16 links. */
 		anchors: boolean;
+		/** Under the text (a live translation's credit line). */
+		footer?: Snippet;
 	}
 
-	let { index, content, label, abbrev, marks, selected, flash, noteOpen, quiet, redLetters, justify, anchors }: Props =
-		$props();
+	let {
+		index,
+		content,
+		label,
+		abbrev,
+		marks,
+		selected,
+		flash,
+		noteOpen,
+		quiet,
+		redLetters,
+		justify,
+		anchors,
+		footer
+	}: Props = $props();
 
 	const PSALMS = 18;
 
@@ -157,6 +173,7 @@
 							>{seg.trail}</span
 						>{/if}{/each}</p>
 		{/each}
+		{@render footer?.()}
 	{/if}
 </section>
 

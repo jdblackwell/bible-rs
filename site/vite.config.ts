@@ -1,8 +1,9 @@
+/// <reference types="vitest/config" />
 import vercel from '@sveltejs/adapter-vercel';
 import type { Adapter } from '@sveltejs/kit';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import { compactRoutes } from './scripts/vercel-routes.js';
+import { addHeaders, compactRoutes } from './scripts/vercel-routes.js';
 
 const base = vercel();
 const adapter: Adapter = {
@@ -10,6 +11,8 @@ const adapter: Adapter = {
 	async adapt(builder) {
 		await base.adapt(builder);
 		compactRoutes('.vercel/output/config.json');
+		// An NLT chapter's address shows the KJV's page (src/hooks.ts): kept out of search results.
+		addHeaders('.vercel/output/config.json', '^/read/nlt(?:/.*)?$', { 'X-Robots-Tag': 'noindex' });
 	}
 };
 
@@ -24,5 +27,6 @@ export default defineConfig({
 			// The reader registers it (for /read only), so the landing page never downloads the reader.
 			serviceWorker: { register: false }
 		})
-	]
+	],
+	test: { include: ['src/**/*.test.ts'] }
 });

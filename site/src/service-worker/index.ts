@@ -6,7 +6,8 @@ import { self } from '$app/service-worker';
  * The reader works offline. Its scripts, wasm and fonts are cached when the worker installs (from
  * the reader only, see Shell.svelte); translations and reader pages the first time they load, and
  * the importers' module the first time a translation is imported. Each deploy starts a fresh
- * cache, since a page refers to its own build's scripts.
+ * cache, since a page refers to its own build's scripts. Nothing from /api (the NLT, read live) is
+ * kept: Tyndale's terms allow no more than a chapter at a time (src/lib/read/nlt.ts).
  */
 const CACHE = `read-${version}`;
 const PRECACHE = [
