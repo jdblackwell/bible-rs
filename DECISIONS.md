@@ -464,6 +464,11 @@ also a static page that search engines can index.
   | none (chapters only, before) | 8,327 | 16,712 | 0.6 GB | 18 s |
   | **KJV, BSB, WEB** ✔ | 102,082 | 110,499 | 2.2 GB | about 2 min |
   | all seven | 226,471 | 234,892 | 4.2 GB | about 6 min |
+- **Topic pages keep references, not text.** Marketing's 50 topics (`site/src/lib/topics/`) list
+  each verse by book, chapter and verse; the page takes the KJV and BSB text from the core as it's
+  prerendered, so a topic can never quote a verse differently from its verse page. A reference
+  the core doesn't have, or a title that doesn't end in the site's name, stops the build. Each verse
+  links to its verse pages, and each verse page links back to the topics that list it.
 - **The site and the apps have different names.** The apps are "Bible" (`NAME`). The website is
   "Simply My Bible" (`SITE_NAME`, at simplymybible.com). It ends every title and is `og:site_name`
   and the WebSite's name in the JSON-LD.

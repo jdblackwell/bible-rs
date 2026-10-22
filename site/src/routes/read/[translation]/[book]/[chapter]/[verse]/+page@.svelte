@@ -1,9 +1,10 @@
 <!--
-	A verse's own page (+page.server.ts): the verse, the two either side, the verse in every
-	translation and the way on to its neighbours, its chapter, the Mac app or the clipboard. Its own
-	layout (@): the reader's is the whole app.
+	A verse's own page (+page.ts): the verse, the two either side, the topics that list it, the verse
+	in every translation and the way on to its neighbours, its chapter, the Mac app or the clipboard.
+	Its own layout (@): the reader's is the whole app.
 -->
 <script lang="ts">
+	import Capsules from '#lib/read/seo/Capsules.svelte';
 	import Frame from '#lib/read/seo/Frame.svelte';
 	import Meta from '#lib/read/seo/Meta.svelte';
 	import Runs from '#lib/read/seo/Runs.svelte';
@@ -61,6 +62,13 @@ document.addEventListener('click', function (e) {
 			</div>
 			<a class="more" href={data.chapter.href}>Read the whole of {data.chapter.label}</a>
 		</section>
+
+		{#if data.topics.length}
+			<section class="topics" aria-labelledby="topics">
+				<h2 id="topics">Topics</h2>
+				<Capsules links={data.topics} />
+			</section>
+		{/if}
 
 		<nav class="steps" aria-label="Verses">
 			{#if data.prev}
@@ -208,6 +216,10 @@ document.addEventListener('click', function (e) {
 		margin-top: 12px;
 		color: var(--accent);
 		font: var(--type-ui-strong);
+	}
+
+	.topics {
+		margin-top: 40px;
 	}
 
 	.steps {

@@ -2,9 +2,15 @@
  * The reader's prerendered pages, listed once for both the routes' `entries` and the sitemaps, so
  * a sitemap never names a page the build didn't make.
  */
-import { bookPath } from '../books';
+import { bookPath, chapterPath, versePath } from '../books';
 import type { Book, Core } from '../core';
 import { VERSE_PAGES } from './meta';
+
+/** Where a link to a verse goes: its own page, or its place in the chapter (#v16) in a translation without verse pages. */
+export const verseHref = (books: Book[], translation: string, index: number, verse: number) =>
+	VERSE_PAGES.includes(translation)
+		? versePath(books, translation, index, verse)
+		: chapterPath(books, translation, index, verse);
 
 export interface ChapterPage {
 	translation: string;

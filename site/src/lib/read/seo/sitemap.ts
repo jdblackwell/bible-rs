@@ -1,11 +1,11 @@
 /**
  * The sitemaps: /sitemap.xml is an index of the files under /sitemaps/, which list the site's own
  * pages and the translations' and books' pages, each translation's chapters, the verse pages
- * (cut into files under the protocol's 50,000 URLs) and the topic pages. Every entry carries the
- * build's date.
+ * (cut into files under the protocol's 50,000 URLs) and the topics' index and pages. Every entry
+ * carries the build's date.
  */
 import { SITE_URL } from '#lib/config.js';
-import { TOPICS, topicPath } from '#lib/topics/index.js';
+import { TOPICS, TOPICS_PATH, topicPath } from '#lib/topics/index.js';
 import { bookPath, translationPath } from '../books';
 import { core } from '../core';
 import { bookPages, chapterPagePath, chapterPages, versePagePath, versePages } from './pages';
@@ -54,7 +54,7 @@ async function list(): Promise<Sitemap[]> {
 			out.push({ file: `verses-${t}-${i + 1}.xml`, paths: paths.slice(i * VERSES_PER_FILE, (i + 1) * VERSES_PER_FILE) });
 		}
 	}
-	out.push({ file: 'topics.xml', paths: TOPICS.map((t) => topicPath(t.slug)) });
+	out.push({ file: 'topics.xml', paths: [TOPICS_PATH, ...TOPICS.map((t) => topicPath(t.slug))] });
 	return out;
 }
 

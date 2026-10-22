@@ -2,7 +2,8 @@ import { error } from '@sveltejs/kit';
 import { bookOf, bookSlug, chapterFromPath, chapterPath, versePath } from '#lib/read/books.js';
 import { CHAPTERS, chapterLabel, core, type Core, type VerseContent } from '#lib/read/core.js';
 import { clip, crumbs, runsText, VERSE_PAGES, verseTitle } from '#lib/read/seo/meta.js';
-import { versePages } from '#lib/read/seo/pages.js';
+import { verseHref, versePages } from '#lib/read/seo/pages.js';
+import { topicName, topicPath, topicsWith } from '#lib/topics/index.js';
 import type { EntryGenerator, PageLoad } from './$types';
 
 /**
@@ -88,13 +89,10 @@ export const load: PageLoad = async ({ params }) => {
 				abbrev: t.abbrev,
 				name: t.name,
 				runs: v?.runs ?? null,
-				href: !v
-					? chapterPath(c.books, t.id, index)
-					: VERSE_PAGES.includes(t.id)
-						? versePath(c.books, t.id, index, verse.number)
-						: chapterPath(c.books, t.id, index, verse.number)
+				href: v ? verseHref(c.books, t.id, index, verse.number) : chapterPath(c.books, t.id, index)
 			};
 		}),
+		topics: topicsWith(ref).map((t) => ({ name: topicName(t), href: topicPath(t.slug) })),
 		copy: c.copyText(id, [ref], 'reference') ?? `${text} — ${label} (${info.abbrev})`,
 		// Opens the Mac app at the verse: its bible:// links take a reference as the jump field does.
 		app: `bible://${encodeURI(label)}?translation=${id}`
