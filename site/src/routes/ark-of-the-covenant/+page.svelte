@@ -33,6 +33,9 @@
 	const value = (d: Dim) => (d.unit === 'count' ? String(d.value) : `${d.value} cubit${d.value === 1 ? '' : 's'}`);
 	const dimName = (key: string) => key.replace(/^./, (c) => c.toUpperCase());
 
+	/** objects/LICENSE: what to credit when reusing the spec or the model's images. */
+	const ATTRIBUTION = `Ark of the Covenant specs and 3D models © 2026 Micky (github.com/michaelshimeles) / bible-rs contributors, licensed CC BY 4.0, ${REPO_URL}`;
+
 	const passages = [
 		{ name: 'Exodus 25', href: chapterLink('Exod.25.10', 'kjv') },
 		{ name: 'Exodus 37', href: chapterLink('Exod.37.1', 'kjv') },
@@ -175,6 +178,11 @@
 			comes from and the KJV and BSB words that give it, or a note saying why it's an interpretive choice. A check runs on every
 			change and finds each quoted phrase in its verse. Think something is wrong?
 			<a href="{REPO_URL}/blob/main/objects/CONTRIBUTING.md">Propose a correction</a>.
+		</p>
+		<p class="license">
+			The spec and the model's images are licensed
+			<a href="https://creativecommons.org/licenses/by/4.0/" rel="license">CC BY 4.0</a>; the code is MIT. Credit them as:
+			{ATTRIBUTION}
 		</p>
 	</section>
 </Frame>
@@ -384,6 +392,12 @@
 		font: var(--type-ui);
 		font-size: 16px;
 		line-height: 25px;
+	}
+
+	.spec .license {
+		margin-top: 12px;
+		color: var(--ink-2);
+		font: var(--type-small);
 	}
 
 	@media (max-width: 860px) {

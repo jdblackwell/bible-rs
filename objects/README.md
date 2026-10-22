@@ -11,8 +11,19 @@ The site makes the 3D model, the verse panel and the object's page from it. The 
 | `object.schema.json` | The JSON Schema every object follows |
 | `cubits.json` | The cubits an object can be shown in, and the person drawn for scale |
 | `cubits.schema.json` | Its schema |
+| `LICENSE` | CC BY 4.0, for everything here |
 
 To propose a correction, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+The specs here and the images rendered from their 3D models
+(`site/static/ark-of-the-covenant/`) are licensed CC BY 4.0
+([LICENSE](LICENSE), legal code in [`LICENSES/CC-BY-4.0.txt`](../LICENSES/CC-BY-4.0.txt)). The code
+that reads them and generates the models' geometry is MIT, like the rest of the repository. Credit
+them as:
+
+> Ark of the Covenant specs and 3D models © 2026 Micky (github.com/michaelshimeles) / bible-rs contributors, licensed CC BY 4.0, https://github.com/michaelshimeles/bible-rs
 
 ## The rules
 
@@ -38,6 +49,7 @@ An object:
 | `id` | `ark` | The file's name |
 | `slug` | `ark-of-the-covenant` | The page's address, `/<slug>` |
 | `title`, `summary` | | Its name, and one sentence on what it is |
+| `license` | `CC-BY-4.0` | The spec's license, always CC BY 4.0 ([LICENSE](LICENSE)) |
 | `sources` | `["Exod.25.10-22", "Exod.37.1-9"]` | The passages that describe it. The readers show the object's glyph after the first verse of each |
 | `unit` | `cubit` | The unit of every length |
 | `parts` | | See below |

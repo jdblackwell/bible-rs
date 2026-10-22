@@ -63,6 +63,8 @@ export interface ObjectSpec {
 	slug: string;
 	title: string;
 	summary: string;
+	/** Always CC BY 4.0 (objects/LICENSE); the code that draws it is MIT. */
+	license: 'CC-BY-4.0';
 	sources: string[];
 	unit: 'cubit';
 	parts: Part[];
@@ -80,6 +82,7 @@ export interface Cubit {
 }
 
 export interface Cubits {
+	license: 'CC-BY-4.0';
 	default: string;
 	cubits: Cubit[];
 	person: { label: string; inches: number };

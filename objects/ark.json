@@ -4,6 +4,7 @@
 	"slug": "ark-of-the-covenant",
 	"title": "The Ark of the Covenant",
 	"summary": "A chest of acacia wood overlaid with pure gold, 2.5 by 1.5 by 1.5 cubits, with a lid of pure gold (the mercy seat) and two gold cherubim on it.",
+	"license": "CC-BY-4.0",
 	"sources": ["Exod.25.10-22", "Exod.37.1-9"],
 	"unit": "cubit",
 	"parts": [
