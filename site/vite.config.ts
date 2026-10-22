@@ -22,7 +22,13 @@ export default defineConfig({
 			},
 			adapter,
 			// The reader registers it (for /read only), so the landing page never downloads the reader.
-			serviceWorker: { register: false }
+			serviceWorker: { register: false },
+			prerender: {
+				// /topics/[slug] has no pages until src/lib/topics/topics.json lists some.
+				handleUnseenRoutes: ({ routes, message }) => {
+					if (routes.some((r) => r !== '/topics/[slug]')) throw new Error(message);
+				}
+			}
 		})
 	]
 });

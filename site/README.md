@@ -6,7 +6,8 @@ The landing page, privacy and support pages (`src/routes/(site)`), and the web r
 
 - Download target + version: `src/lib/config.ts` (`DOWNLOAD_URL`, `VERSION`, `SITE_URL`).
 - `/download` returns a 302 to `DOWNLOAD_URL` (serverless function); the page itself is prerendered.
-- Page metadata (title, canonical, Open Graph, Twitter, JSON-LD) lives in `src/routes/(site)/+page.svelte` and is built from `SITE_URL`. `static/robots.txt` repeats the origin; `/sitemap.xml` is generated (`src/routes/sitemap.xml`) and lists every reader chapter.
+- Page metadata (title, canonical, Open Graph, Twitter, JSON-LD) lives in `src/routes/(site)/+page.svelte` and is built from `SITE_URL`. `static/robots.txt` repeats the origin.
+- `/sitemap.xml` is a sitemap index of the files under `/sitemaps/` (`src/lib/read/seo/sitemap.ts`): the site's pages with the translations' and books' pages, each translation's chapters, the verse pages (in files of at most 40,000 URLs) and the topic pages. Every entry's `lastmod` is the build's date.
 - The demo under the hero is drawn in HTML, not recorded: `src/lib/demo/script.ts` is its timeline (chapters, captions, sound cues), `Scene.svelte` renders one moment of it, `Showcase.svelte` adds the controls and `sound.ts` synthesises the clicks with Web Audio.
 - The feature cards are in `src/lib/cards/`, built from the app's UI pieces in `src/lib/app/` and the app's colours in `src/app.css` (`.app`).
 - Scripture shown on the site lives in `src/lib/scripture.ts`. Use only public-domain text (KJV, WEB, BSB and the other built-in translations), never the online ones.
@@ -21,7 +22,13 @@ The Mac app in the browser. [DECISIONS.md](../DECISIONS.md#web-the-core-in-webas
 - Importing: `src/lib/read/imports.ts` picks or takes dropped files, talks to `import.worker.ts` (which runs `bible_import`), and stores imported translations in IndexedDB (`bible-read`) with their list in `localStorage`. `overlays/importer.svelte.ts` is the import sheet's state.
 - `/read/onboarding.json` (prerendered) holds the first-visit screen's translation previews. The first visit shows it unless the address names a translation.
 - `src/lib/read/core.ts` wraps the module: on the server it reads the wasm and `data/translations/*.bbl` from disk (`node.ts`); in the browser it fetches them (`/translations/<id>.bbl`, prerendered by `src/routes/translations`).
-- Routes: `src/routes/read/+layout.server.ts` typesets the chapter with the default settings for every page; `/read/[translation]/[book]/[chapter]` is prerendered for every chapter of every bundled translation; `/read` restores the saved place.
+- Routes: `src/routes/read/+layout.server.ts` typesets the chapter with the default settings for every page; `/read/[translation]/[book]/[chapter]` is prerendered for every chapter of every bundled translation; `/read` restores the saved place and names John 1 as its canonical URL.
+- Plain pages have no app and no client-side JavaScript (`csr = false`). Each has its own layout (`+page@.svelte`) and `src/lib/read/seo/Frame.svelte` draws the frame. `/read/[translation]` lists a translation's books, `/read/[translation]/[book]` lists a book's chapters with each one's opening words, and `/read/[translation]/[book]/[chapter]/[verse]` shows a verse with the verses either side and the verse in every translation.
+- Verse pages exist for the translations in `VERSE_PAGES` (`src/lib/read/seo/meta.ts`), the KJV, BSB and WEB. All seven would nearly double the build (DECISIONS.md has the numbers). The other translations' verses link to their place in the chapter (`#v16`).
+- Titles, descriptions, canonical URLs, Open Graph and Twitter tags and the JSON-LD (a WebPage in the WebSite, with its breadcrumb trail) come from `src/lib/read/seo/` (`meta.ts`, `Meta.svelte`) for every reader page.
+- The reader's places are real links, so search engines can follow them and a modified click opens a new tab. The reader handles a plain click itself (`ui/follow.ts`). They are the sidebar's books and chapters, the book picker, the translation menu, and a chapter navigation (`chrome/PageLinks.svelte`) that stays hidden until it has keyboard focus. Every verse of the chapter in the address has an `id` (`v16`).
+- `/john/3/16` and `/john/3` redirect (308) to the verse's or the chapter's KJV page (`src/routes/[book=book]/[chapter=number]/[[verse=number]]`, served by a function).
+- `/topics/<slug>` (`src/routes/topics/[slug]`) prints, in the KJV, the passages that a topic in `src/lib/topics/topics.json` lists. The file is empty for now, so there are no topic pages and the topics sitemap is empty.
 - `src/lib/read/app.svelte.ts` is the app's state and actions (the Mac's `App`); `Shell.svelte` is the window; `keyboard.ts` the shortcuts; `reader/` the continuous-scroll reader; the rest mirrors the Mac's components (`chrome/`, `sidebar/`, `overlays/`, `pages/`, `settings/`, `onboarding/`), drawn with the controls in `ui/`.
 - Settings are the Mac's `Settings` (`settings.ts`), saved in `localStorage` with the study data (the core's JSON export) and up to a few automatic backups.
 - Design tokens: `src/lib/read/tokens.css` is generated from `crates/app/assets/design-tokens.json` by `node scripts/tokens.js`. Fonts: `static/fonts/read/` is cut from the Mac app's Literata and Inter by `scripts/fonts.sh` (needs fonttools and brotli). Both outputs are committed.
@@ -31,5 +38,5 @@ The Mac app in the browser. [DECISIONS.md](../DECISIONS.md#web-the-core-in-webas
 ## Building
 
 - Requires Node >= 22.17 (SvelteKit 3). `.npmrc` sets `engine-strict`, so on a newer Node use `npm install --engine-strict=false`.
-- `npm install && npm run build && npx vite preview`. The build prerenders the reader's 8,323 chapter pages.
+- `npm install && npm run build && npx vite preview`. The build prerenders about 102,000 pages: the reader's 8,323 chapters, 469 translation and book pages and 93,286 verse pages (about 2 minutes and 2.2 GB on an M-series Mac).
 - Vercel: project `bible-rs`, team `goshen-labs`, builds from `site/` -> https://bible.rasmic.xyz. The build reads `../data/translations`, so the project includes files outside its root directory.

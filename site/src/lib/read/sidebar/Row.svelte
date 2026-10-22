@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Icon, type IconName } from '../ui';
+	import { follow } from '../ui/follow';
 
 	interface Props {
 		icon?: IconName;
@@ -16,6 +17,8 @@
 		/** The closed chevron shows only under the pointer. */
 		disclosureOnHover?: boolean;
 		selected?: boolean;
+		/** The place the row stands for (a book's page): a real link, which the click still handles. */
+		href?: string;
 		onclick: (e: MouseEvent) => void;
 		/** A click on the chevron (when it does something other than the row). */
 		onchevron?: () => void;
@@ -32,6 +35,7 @@
 		disclosure,
 		disclosureOnHover = false,
 		selected = false,
+		href,
 		onclick,
 		onchevron,
 		el = $bindable()
@@ -40,14 +44,31 @@
 
 <!-- A source-list row: 32 pt, 8 pt in, a 16 pt icon in the accent, the label 8 pt after it, a
      count and a disclosure chevron at the end. -->
-<button
-	bind:this={el}
-	type="button"
-	class={['row', { selected }]}
-	aria-current={selected || undefined}
-	aria-expanded={disclosure}
-	{onclick}
->
+{#if href}
+	<a
+		bind:this={el}
+		{href}
+		class={['row', 'follow', { selected }]}
+		aria-current={selected || undefined}
+		aria-expanded={disclosure}
+		use:follow={onclick}
+	>
+		{@render content()}
+	</a>
+{:else}
+	<button
+		bind:this={el}
+		type="button"
+		class={['row', { selected }]}
+		aria-current={selected || undefined}
+		aria-expanded={disclosure}
+		{onclick}
+	>
+		{@render content()}
+	</button>
+{/if}
+
+{#snippet content()}
 	{#if indent}<span style:width="{indent}px" class="indent"></span>{/if}
 	{#if icon}<Icon name={icon} size={16} class={quietIcon ? 'lead quiet' : 'lead'} />{/if}
 	<span class="label">{label}</span>
@@ -67,7 +88,7 @@
 			<Icon name={disclosure ? 'chevron-down' : 'disclosure'} size={12} />
 		</span>
 	{/if}
-</button>
+{/snippet}
 
 <style>
 	.row {

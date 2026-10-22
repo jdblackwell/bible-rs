@@ -22,7 +22,7 @@
 	let field = $state<HTMLInputElement>();
 	let currentRow = $state<HTMLElement>();
 
-	const books = $derived(app.core?.books ?? []);
+	const books = $derived(app.books);
 	const reading = $derived(app.page === 'reader');
 	const currentBook = $derived(books.findLast((b) => b.firstChapter <= app.here.chapter)?.index ?? -1);
 	const counts = $derived(app.counts());
@@ -238,16 +238,18 @@
 							indent={24}
 							count={b.chapters}
 							selected
+							href={app.bookHref(b)}
 							onclick={() => pickBook(b)}
 						/>
 					{:else}
-						<Row label={b.name} indent={24} onclick={() => pickBook(b)} />
+						<Row label={b.name} indent={24} href={app.bookHref(b)} onclick={() => pickBook(b)} />
 					{/if}
 					{#if st.expanded === b.index && b.chapters > 1}
 						<ChapterGrid
 							book={b}
 							current={app.here.chapter}
 							{activity}
+							href={(chapter) => app.chapterHref(chapter)}
 							onpick={(chapter) => app.dispatch({ type: 'jump', chapter })}
 						/>
 					{/if}
