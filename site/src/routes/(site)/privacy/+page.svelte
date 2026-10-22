@@ -73,8 +73,9 @@
 		site's own key. Tyndale sees which chapter the site asked for, but not your browser or your IP
 		address. Vercel's servers keep each chapter for up to a day, so the next reader of it
 		doesn't ask Tyndale again. To keep the service from being overused, the site counts how many
-		chapters each IP address asks for, in memory, for no more than a day. Your browser keeps only
-		the chapter on screen, and only until you move on.
+		chapters each IP address asks for. The counts are kept in memory and deleted about a day after
+		that address's first request. Your browser keeps only the chapter on screen, and only until
+		you move on.
 	</p>
 
 	<h2>Changes and questions</h2>

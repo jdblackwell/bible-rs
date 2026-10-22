@@ -1,16 +1,18 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { BOOKS } from '../read/books';
+import * as wasm from '../read/wasm/bible.js';
 import {
 	apiBook,
 	apiReference,
 	LIMITS,
-	MAX_VERSE,
 	MAX_VERSES,
+	oneChapterBook,
 	parsePassage,
 	passageLabel,
 	RateLimiter,
-	verseExcerpt,
-	wholeBook
+	VERSES,
+	verseExcerpt
 } from './nlt';
 
 /** The API reference a passage asks for, or the error. */
@@ -61,7 +63,13 @@ describe('parsePassage', () => {
 		expect(api('John 0')).toBe('error: John has 21 chapters');
 		expect(api('John 3:0')).toMatch(/No such verses/);
 		expect(api('John 3:18-16')).toMatch(/No such verses/);
-		expect(api(`Psalm 119:${MAX_VERSE + 1}`)).toMatch(/No such verses/);
+		expect(api('Psalm 119:178')).toMatch(/No such verses/);
+		// The KJV's count and one more: John 3 has 36 verses.
+		expect(api('John 3:36')).toBe('John.3.36');
+		expect(api('John 3:37')).toBe('John.3.37');
+		expect(api('John 3:38')).toMatch(/No such verses/);
+		expect(api('John 3:175')).toMatch(/No such verses/);
+		expect(api('3 John 1:15')).toBe('3Jn.1.15');
 	});
 
 	it('refuses what isn’t a reference', () => {
@@ -73,19 +81,29 @@ describe('parsePassage', () => {
 		expect(api('John 3 '.repeat(20))).toMatch(/too long/);
 	});
 
-	it('labels a passage and marks a one-chapter book as a whole book', () => {
+	it('labels a passage and marks any passage of a one-chapter book', () => {
 		const label = (ref: string) => {
 			const p = parsePassage(ref);
-			return p.ok ? [passageLabel(p.passage), wholeBook(p.passage)] : null;
+			return p.ok ? [passageLabel(p.passage), oneChapterBook(p.passage)] : null;
 		};
 		expect(label('psalms 23')).toEqual(['Psalm 23', false]);
 		expect(label('John 3:16-18')).toEqual(['John 3:16–18', false]);
 		expect(label('Jude 1')).toEqual(['Jude 1', true]);
-		expect(label('Jude 1:3')).toEqual(['Jude 1:3', false]);
+		expect(label('Jude 1:1-25')).toEqual(['Jude 1:1–25', true]);
+		expect(label('Jude 1:3')).toEqual(['Jude 1:3', true]);
 	});
 
 	it('never asks the API for more than 500 verses', () => {
-		expect(MAX_VERSE).toBeLessThanOrEqual(MAX_VERSES);
+		expect(Math.max(...VERSES.flat()) + 1).toBeLessThanOrEqual(MAX_VERSES);
+	});
+});
+
+describe('VERSES', () => {
+	it('agrees with the core’s verse counts for all 1,189 chapters', () => {
+		wasm.initSync({ module: readFileSync('src/lib/read/wasm/bible_bg.wasm') });
+		const core = BOOKS.map((b) => Array.from({ length: b.chapters }, (_, i) => wasm.chapterVerses(b.firstChapter + i)));
+		expect(VERSES).toEqual(core);
+		expect(VERSES.flat().reduce((a, b) => a + b, 0)).toBe(31_102);
 	});
 });
 
@@ -148,6 +166,18 @@ describe('RateLimiter', () => {
 		for (let i = 0; i < 86_400; i++, t += 1000) if (r.take('a', t) === 0) served++;
 		expect(served).toBe(300);
 		expect(r.take('a', 86_400_000)).toBe(0);
+	});
+
+	it('forgets clients a minute or less after their windows end', () => {
+		const r = new RateLimiter([{ max: 1, per: MIN }]);
+		r.take('a', 0);
+		r.take('b', 30_000);
+		expect(r.size).toBe(2);
+		// The next request after a minute sweeps: a's window has ended, b's hasn't.
+		r.take('c', MIN);
+		expect(r.size).toBe(2);
+		r.sweep(MIN + 30_000);
+		expect(r.size).toBe(1);
 	});
 
 	it('forgets clients whose windows have ended once it holds too many', () => {

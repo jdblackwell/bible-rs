@@ -27,7 +27,7 @@ change, so the publishers' pages are linked below.
 `/api/nlt`, which holds the site's own key. Each request asks Tyndale for one chapter or less. The
 site refuses whole books and passages that cross chapters, and each IP address can ask for 20
 chapters a minute and 300 a day. Tyndale receives only the passage, from the site's server.
-Vercel's servers keep a chapter for a day, but never a one-chapter book. The browser keeps only the
+Vercel's servers keep a chapter for a day, but nothing from a one-chapter book (Jude, say). The browser keeps only the
 chapter on screen, in memory. The reader stores none of it, the offline cache skips it, and the
 site's pages, sitemaps and link previews never contain it. Tyndale's credit line is under the chapter, linked to
 [newlivingtranslation.com](https://www.newlivingtranslation.com). Highlights, notes and bookmarks

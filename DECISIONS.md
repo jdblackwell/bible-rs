@@ -512,7 +512,7 @@ also a static page that search engines can index.
   passages across chapters, and allows 20 chapters a minute and 300 a day for each address. Each
   function instance counts these on its own, so they slow one client down rather than cap the site.
   Browsers get `Cache-Control: no-store`, and Vercel's edge keeps a chapter for a day
-  (`Vercel-CDN-Cache-Control`), except a one-chapter book, which would be the whole book. The page
+  (`Vercel-CDN-Cache-Control`), but nothing from a one-chapter book, which could be the whole book. The page
   parses the HTML with the core's NLT parser (`bible_core::nlt_html`, shared with the Mac's
   `online::nlt`), and the core holds that one chapter until the reader moves on. So the reader
   shows one NLT chapter at a time, ending in Tyndale's credit line and links to the chapters

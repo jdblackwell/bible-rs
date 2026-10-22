@@ -4,11 +4,11 @@ import {
 	apiReference,
 	LIMITS,
 	MAX_VERSES,
+	oneChapterBook,
 	parsePassage,
 	passageLabel,
 	RateLimiter,
-	verseExcerpt,
-	wholeBook
+	verseExcerpt
 } from '#lib/server/nlt.js';
 import type { RequestHandler } from './$types';
 
@@ -16,12 +16,14 @@ import type { RequestHandler } from './$types';
  * The NLT for the reader (src/lib/read/nlt.ts): /api/nlt?ref=John+3 asks Tyndale's NLT API for
  * one chapter or less with the site's key (NLT_API_KEY, which never leaves the server) and returns
  * its verses' HTML with Tyndale's credit line. Browsers are told to keep nothing; Vercel's edge
- * keeps a chapter for a day, except a one-chapter book, which would be the whole book.
+ * keeps a chapter for a day, but nothing from a one-chapter book, which could be the whole book.
  */
 export const prerender = false;
 
 const API = 'https://api.nlt.to/api/passages';
 const limiter = new RateLimiter(LIMITS);
+// Clients are also forgotten while no requests come in (the timer doesn't keep the process alive).
+setInterval(() => limiter.sweep(), 60_000).unref?.();
 
 const headers = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex' };
 const refuse = (status: number, error: string, extra: Record<string, string> = {}) =>
@@ -81,7 +83,7 @@ export const GET: RequestHandler = async ({ url, getClientAddress }) => {
 				...headers,
 				// Only Vercel reads this (and drops it from the response). A day keeps popular
 				// chapters off Tyndale's daily limit without keeping text for long.
-				...(wholeBook(passage) ? {} : { 'vercel-cdn-cache-control': 'max-age=86400' })
+				...(oneChapterBook(passage) ? {} : { 'vercel-cdn-cache-control': 'max-age=86400' })
 			}
 		}
 	);

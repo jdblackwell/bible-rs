@@ -152,6 +152,9 @@ export interface ReaderHandle {
 	markerRect(v: VerseRef): DOMRect | null;
 }
 
+/** Translations read live from their publisher, a chapter at a time (the NLT: nlt.ts). */
+const LIVE: TranslationInfo[] = [NLT_INFO];
+
 /** Sessions shorter than this aren't history (reading.rs). */
 const MIN_SECONDS = 8;
 const MAX_GAP = 120;
@@ -193,14 +196,10 @@ export class ReadApp {
 	coreError = $state<string | null>(null);
 	/** Every translation in the library (the bundled ones, from the page's data). */
 	translations = $state.raw<TranslationInfo[]>([]);
-	/** Translations read live from their publisher, a chapter at a time (the NLT: nlt.ts). They
-	 *  aren't in the library: only the translation menu offers them. */
-	readonly live: TranslationInfo[] = [NLT_INFO];
 	/** The live translation's one chapter. */
 	readonly liveChapter = new LiveChapter();
-	/** The translation read before a live one: what search, study lists and exports use meanwhile,
-	 *  and what the reader goes back to when the live one can't be read. */
-	fallback = $state(DEFAULT_TRANSLATION);
+	/** The translation read before a live one (see `fallback`). */
+	#before = $state(DEFAULT_TRANSLATION);
 	/** Translations decoded and ready. */
 	readonly loaded = new SvelteSet<string>();
 	/** The defaults until the saved settings are adopted after hydration (`adopt`). */
@@ -276,7 +275,7 @@ export class ReadApp {
 	}) {
 		this.translations = init.translations;
 		this.settings.translation = init.translation;
-		this.fallback = init.translation;
+		this.#before = init.translation;
 		this.here = { chapter: init.chapter, verse: 1 };
 		this.#content.set(this.#key(init.translation, init.chapter, contentOptions(defaultTypography())), init.content);
 		this.#initNames = { index: init.chapter, label: init.label, short: init.short };
@@ -383,7 +382,7 @@ export class ReadApp {
 		if (this.liveChapter.held === index && this.loaded.has(id)) return true;
 		this.loaded.delete(id);
 		this.#forget(id);
-		void this.ensure(this.fallback);
+		void this.ensure(this.fallback());
 		try {
 			if (!(await this.liveChapter.read(core, index))) return false;
 			this.loaded.add(id);
@@ -391,14 +390,15 @@ export class ReadApp {
 		} catch (e) {
 			if (this.settings.translation !== id) return false;
 			const abbrev = this.info(id)?.abbrev ?? id.toUpperCase();
-			const back = this.info(this.fallback)?.abbrev ?? this.fallback.toUpperCase();
+			const fallback = this.fallback();
+			const back = this.info(fallback)?.abbrev ?? fallback.toUpperCase();
 			const why =
 				e instanceof LiveError && e.kind === 'busy'
 					? `too many requests, try again in ${e.retryAfter < 90 ? `${e.retryAfter} s` : `${Math.ceil(e.retryAfter / 60)} min`}`
 					: e instanceof Error
 						? e.message
 						: String(e);
-			this.dispatch({ type: 'setTranslation', id: this.fallback });
+			this.dispatch({ type: 'setTranslation', id: fallback });
 			this.toastNow(`Couldn't load ${abbrev} (${why}). Showing ${back}`, () =>
 				this.dispatch({ type: 'setTranslation', id })
 			);
@@ -467,15 +467,36 @@ export class ReadApp {
 		return this.translations.find((t) => t.id === id) ?? this.live.find((t) => t.id === id);
 	}
 
+	/**
+	 * The live translations the translation menu offers; they aren't in the library. Imports can't
+	 * take their ids (`takenIds`), but one imported before the NLT came to the web may have its id:
+	 * then that import is read instead.
+	 */
+	get live(): TranslationInfo[] {
+		return LIVE.filter((l) => !this.translations.some((t) => t.id === l.id));
+	}
+
 	isLive(id: string): boolean {
 		return this.live.some((t) => t.id === id);
 	}
 
+	/** The ids a new import mustn't take: the library's and the live translations'. */
+	takenIds(): string[] {
+		return [...this.translations, ...LIVE].map((t) => t.id);
+	}
+
+	/** What the reader goes back to when a live translation can't be read: the translation read
+	 *  before it, while it's still in the library, else the default. */
+	fallback(): string {
+		const id = this.#before;
+		return this.info(id) && !this.isLive(id) ? id : DEFAULT_TRANSLATION;
+	}
+
 	/** The translation search, the study lists and exports take their text from: the one being read,
-	 *  or while that's a live one (which holds one chapter, and isn't to be stored), the one before. */
+	 *  or while that's a live one (which holds one chapter, and isn't to be stored), the fallback. */
 	textTranslation(): string {
 		const id = this.settings.translation;
-		return this.isLive(id) ? this.fallback : id;
+		return this.isLive(id) ? this.fallback() : id;
 	}
 
 	/** The translations shown: the reading one, then up to three parallel columns. */
@@ -936,7 +957,7 @@ export class ReadApp {
 			case 'setTranslation':
 				if (this.info(a.id)) {
 					const before = s.translation;
-					if (!this.isLive(before)) this.fallback = before;
+					if (!this.isLive(before)) this.#before = before;
 					s.translation = a.id;
 					s.parallel = s.parallel.filter((p) => p !== a.id);
 					// A live translation's chapter goes when the reader leaves it.
