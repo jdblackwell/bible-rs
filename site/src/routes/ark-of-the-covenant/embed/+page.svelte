@@ -33,9 +33,17 @@
 </main>
 
 <style>
+	/* Wide, the viewer fills the window and its panel scrolls; narrow, the page scrolls (Viewer.svelte). */
 	:global(html[data-read]),
 	:global(html[data-read] body) {
 		overflow: hidden;
+	}
+
+	@media (max-width: 860px) {
+		:global(html[data-read]),
+		:global(html[data-read] body) {
+			overflow: auto;
+		}
 	}
 
 	.embed {

@@ -107,6 +107,16 @@ pub fn page_theme(t: Theme) -> &'static str {
     }
 }
 
+/// Tells the page the app's theme (`window.ark` in the page's Viewer.svelte).
+fn set_theme(theme: Theme) -> String {
+    format!("window.ark?.setTheme('{}')", page_theme(theme))
+}
+
+/// Tells the page the app's translation; it fetches `verses.json` for it again.
+fn set_translation(translation: &str) -> String {
+    format!("window.ark?.setTranslation({})", serde_json::json!(translation))
+}
+
 /// `/<slug>/verses.json`: the verses the object's page quotes, in `translation` and then the
 /// KJV for whatever it lacks. An online translation gives only the chapters already saved on
 /// this Mac; asking for the rest would reach the network.
@@ -297,11 +307,11 @@ impl ObjectView {
         if self.translation != translation {
             *self.verses.lock().unwrap() = Arc::new(verses_json(object, library, translation));
             self.translation = translation.to_string();
-            self.script(&format!("window.ark?.setTranslation({})", serde_json::json!(translation)));
+            self.script(&set_translation(translation));
         }
         if self.theme != Some(theme) {
             self.theme = Some(theme);
-            self.script(&format!("window.ark?.setTheme('{}')", page_theme(theme)));
+            self.script(&set_theme(theme));
         }
         let want = Some((physical, !covered));
         if self.placed != want {
@@ -313,10 +323,16 @@ impl ObjectView {
     /// Takes the page's messages since the last frame.
     pub fn messages(&mut self) -> Vec<Message> {
         let out = std::mem::take(&mut *self.inbox.lock().unwrap());
-        if out.contains(&Message::Ready)
-            && let Some(t) = self.opened.take()
-        {
-            self.first_draw = Some(t.elapsed());
+        if out.contains(&Message::Ready) {
+            if let Some(t) = self.opened.take() {
+                self.first_draw = Some(t.elapsed());
+            }
+            // A change sent while the page was starting reached no `window.ark`: send the
+            // settings again now that it's listening.
+            if let Some(theme) = self.theme {
+                self.script(&set_theme(theme));
+            }
+            self.script(&set_translation(&self.translation));
         }
         out
     }
@@ -423,6 +439,14 @@ mod tests {
         assert_eq!(parse_message(r#"{"type":"ready"}"#), Some(Message::Ready));
         assert_eq!(parse_message(r#"{"type":"read","ref":"Nope.1.1"}"#), None);
         assert_eq!(parse_message("not json"), None);
+    }
+
+    #[test]
+    fn settings_reach_the_page_as_scripts() {
+        assert_eq!(set_theme(Theme::Sepia), "window.ark?.setTheme('sepia')");
+        assert_eq!(set_translation("bsb"), r#"window.ark?.setTranslation("bsb")"#);
+        // A translation id can't close the string it's sent in.
+        assert_eq!(set_translation("a\"b"), r#"window.ark?.setTranslation("a\"b")"#);
     }
 
     #[test]

@@ -769,12 +769,19 @@
 			border-radius: 0;
 		}
 
+		/* A narrow window (the Mac's sidebar open): one column the page scrolls, as on a phone. */
+		.embed {
+			height: auto;
+			min-height: 100vh;
+		}
+
 		.embed .stage {
-			height: 60vh;
+			height: max(60vh, 220px);
 			border-radius: 12px;
 		}
 
 		.embed .panel {
+			overflow: visible;
 			max-height: none;
 		}
 
