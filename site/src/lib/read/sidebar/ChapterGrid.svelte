@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Book } from '../core';
+	import { follow } from '../ui/follow';
 
 	interface Props {
 		book: Book;
@@ -7,10 +8,12 @@
 		current: number;
 		/** Chapters (indices) with highlights or notes. */
 		activity: Set<number>;
+		/** A chapter's address (each chip is a link to it). */
+		href: (chapter: number) => string;
 		onpick: (chapter: number) => void;
 	}
 
-	let { book, current, activity, onpick }: Props = $props();
+	let { book, current, activity, href, onpick }: Props = $props();
 </script>
 
 <!-- The open book's chapters: 24 pt chips in sevens, the current one solid accent; a dot marks
@@ -19,15 +22,15 @@
 	{#each { length: book.chapters }, i (i)}
 		{@const index = book.firstChapter + i}
 		{@const here = index === current}
-		<button
-			type="button"
-			class={['chip', { here, active: !here && activity.has(index) }]}
+		<a
+			href={href(index)}
+			class={['chip', 'follow', { here, active: !here && activity.has(index) }]}
 			aria-current={here || undefined}
 			aria-label="{book.name} {i + 1}"
-			onclick={() => onpick(index)}
+			use:follow={() => onpick(index)}
 		>
 			{i + 1}
-		</button>
+		</a>
 	{/each}
 </div>
 
@@ -41,6 +44,8 @@
 
 	.chip {
 		position: relative;
+		display: grid;
+		place-items: center;
 		width: 24px;
 		height: 24px;
 		border-radius: 50%;
