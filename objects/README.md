@@ -59,8 +59,9 @@ A part:
 
 `node site/src/lib/objects/check.mjs` validates each file against its schema, then checks what a
 schema can't: that every reference is a verse the repository's KJV and BSB both have, that every
-quote is in its verse in that translation, that ids are unique, and that the assembly and the
-options name real parts and choices. It prints what it checked, or every problem and exits 1.
+quote is in its verse in that translation, that a stated number is the one its quoted words give
+("two cubits and a half" is 2.5), that ids are unique, that the assembly and the options name
+real parts and choices, and that the parts and numbers `scene.ts` draws are there. It prints what it checked, or every problem and exits 1.
 CI runs it on every pull request, and the site runs the same check while it builds the page, so
 the site can't publish a wrong number.
 

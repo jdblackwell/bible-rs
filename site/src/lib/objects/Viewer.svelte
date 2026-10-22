@@ -73,12 +73,17 @@
 	const abbrevOf = (ref: string) => (texts.verses[ref] ? texts.abbrev : kjv.abbrev);
 	const linkFor = (ref: string) => verseLink(ref, texts.verses[ref] && listed.includes(texts.id) ? texts.id : 'kjv');
 
+	/** The latest translation asked for: an older request that answers late is ignored. */
+	let asked = '';
+
 	async function useTranslation(id: string) {
+		asked = id;
 		if (id === texts.id) {
 			missing = null;
 			return;
 		}
 		const t = id === 'kjv' ? kjv : await textsIn(id, versesUrl, refs, imported);
+		if (asked !== id) return;
 		if (t) {
 			texts = t;
 			missing = null;

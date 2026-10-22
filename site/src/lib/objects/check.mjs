@@ -58,6 +58,21 @@ export function parseOsis(/** @type {string} */ osis, /** @type {Book[]} */ book
 	return verses;
 }
 
+const NUMBERS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12 };
+
+/**
+ * The number a quote states: "two cubits and a half" and "two and a half cubits" are 2.5, "a cubit
+ * and a half" is 1.5, "four rings of gold" is 4. Null when it states none.
+ */
+export function statedNumber(/** @type {string} */ quote) {
+	const words = quote.toLowerCase().match(/[a-z]+|\d+(?:\.\d+)?/g) ?? [];
+	const at = words.findIndex((w, i) => w in NUMBERS || /^\d/.test(w) || ((w === 'a' || w === 'an') && /^cubits?$/.test(words[i + 1] ?? '')));
+	if (at < 0) return null;
+	const w = words[at];
+	const n = /** @type {Record<string, number>} */ (NUMBERS)[w] ?? (/^\d/.test(w) ? Number(w) : 1);
+	return words.slice(at).join(' ').includes('and a half') ? n + 0.5 : n;
+}
+
 /** Curly and straight quotes, and runs of spaces, count as the same. */
 const plain = (/** @type {string} */ s) => s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
 
@@ -123,6 +138,13 @@ export function check({ name, spec, cubits, schemas, books, text }) {
 		for (const [key, d] of Object.entries(all)) {
 			if (d.ref && d.quote) quoted(`${where}.${key}`, d.ref, d.quote);
 			else if (d.ref) verse(`${where}.${key}`, d.ref);
+			// A stated number has to be the one its words give, in each translation.
+			if (!d.interpretive && d.quote)
+				for (const t of QUOTED) {
+					const n = statedNumber(d.quote[t]);
+					if (n !== d.value)
+						problems.push(`${where}.${key}: its value is ${d.value}, but the ${t.toUpperCase()}'s words "${d.quote[t]}" give ${n ?? 'no number'}`);
+				}
 		}
 	};
 
