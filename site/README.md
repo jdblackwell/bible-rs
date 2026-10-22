@@ -5,6 +5,7 @@ The landing page, privacy and support pages (`src/routes/(site)`), and the web r
 ## Landing page
 
 - Download target + version: `src/lib/config.ts` (`DOWNLOAD_URL`, `VERSION`, `SITE_URL`).
+- Names: `NAME` ("Bible") is the apps' name, in the headings and links that name them. `SITE_NAME` ("Simply My Bible") is the website's. Every page's title ends with it, and it is `og:site_name` and the WebSite's name in the JSON-LD.
 - `/download` returns a 302 to `DOWNLOAD_URL` (serverless function); the page itself is prerendered.
 - Page metadata (title, canonical, Open Graph, Twitter, JSON-LD) lives in `src/routes/(site)/+page.svelte` and is built from `SITE_URL`. `static/robots.txt` repeats the origin.
 - `/sitemap.xml` is a sitemap index of the files under `/sitemaps/` (`src/lib/read/seo/sitemap.ts`): the site's pages with the translations' and books' pages, each translation's chapters, the verse pages (in files of at most 40,000 URLs) and the topic pages. Every entry's `lastmod` is the build's date.
@@ -39,4 +40,4 @@ The Mac app in the browser. [DECISIONS.md](../DECISIONS.md#web-the-core-in-webas
 
 - Requires Node >= 22.17 (SvelteKit 3). `.npmrc` sets `engine-strict`, so on a newer Node use `npm install --engine-strict=false`.
 - `npm install && npm run build && npx vite preview`. The build prerenders about 102,000 pages: the reader's 8,323 chapters, 469 translation and book pages and 93,286 verse pages (about 2 minutes and 2.2 GB on an M-series Mac).
-- Vercel: project `bible-rs`, team `goshen-labs`, builds from `site/` -> https://bible.rasmic.xyz. The build reads `../data/translations`, so the project includes files outside its root directory.
+- Vercel: project `bible-rs`, team `goshen-labs`, builds from `site/` -> https://simplymybible.com (`SITE_URL`). The old address, bible.rasmic.xyz, should redirect there (308). The build reads `../data/translations`, so the project includes files outside its root directory.

@@ -3,7 +3,7 @@
  * breadcrumbs and their JSON-LD, made the same way for a chapter (the reader itself), a verse, a
  * book and a translation. Absolute URLs come from SITE_URL.
  */
-import { NAME, SITE_URL } from '#lib/config.js';
+import { SITE_NAME, SITE_URL } from '#lib/config.js';
 import { bookPath, translationPath } from '../books';
 import type { Book, Run } from '../core';
 
@@ -34,17 +34,23 @@ export function clip(text: string, max: number): string {
 
 const TITLE = 60;
 
-export const chapterTitle = (label: string, abbrev: string) => `${label} ${abbrev} – Read the Full Chapter | ${NAME}`;
+/** What ends every title. */
+const BRAND = ` | ${SITE_NAME}`;
+
+export const chapterTitle = (label: string, abbrev: string) => `${label} ${abbrev} – Read the Full Chapter${BRAND}`;
 
 export const bookTitle = (book: Book, abbrev: string) =>
-	`The Book of ${book.name} (${abbrev}) – ${book.chapters === 1 ? '1 Chapter' : `All ${book.chapters} Chapters`} | ${NAME}`;
+	`The Book of ${book.name} (${abbrev}) – ${book.chapters === 1 ? '1 Chapter' : `All ${book.chapters} Chapters`}${BRAND}`;
 
-export const translationTitle = (name: string, abbrev: string) => `${name} (${abbrev}) – All 66 Books | ${NAME}`;
+export const translationTitle = (name: string, abbrev: string) => `${name} (${abbrev}) – All 66 Books${BRAND}`;
 
-/** `John 3:16 KJV – "For God so loved the world, that he gave…"`: the verse's opening words, to 60 characters. */
+/**
+ * `John 3:16 KJV – "For God so loved the…" | Simply My Bible`: as many of the verse's opening words
+ * as fit in 60 characters, and never fewer than 20 characters of them.
+ */
 export function verseTitle(label: string, abbrev: string, text: string): string {
 	const head = `${label} ${abbrev} – "`;
-	return `${head}${clip(text, Math.max(20, TITLE - head.length - 1))}"`;
+	return `${head}${clip(text, Math.max(20, TITLE - head.length - 1 - BRAND.length))}"${BRAND}`;
 }
 
 export interface Crumb {
@@ -82,7 +88,7 @@ export function jsonLd(page: PageMeta): string {
 	const graph = {
 		'@context': 'https://schema.org',
 		'@graph': [
-			{ '@type': 'WebSite', '@id': site, url: `${SITE_URL}/`, name: NAME, inLanguage: 'en' },
+			{ '@type': 'WebSite', '@id': site, url: `${SITE_URL}/`, name: SITE_NAME, inLanguage: 'en' },
 			{
 				'@type': 'WebPage',
 				'@id': url,
