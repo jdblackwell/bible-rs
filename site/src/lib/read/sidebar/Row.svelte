@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { Icon, type IconName } from '../ui';
 	import { follow } from '../ui/follow';
+	import type { Mark } from './marks';
+	import Ring from './Ring.svelte';
 
 	interface Props {
 		icon?: IconName;
@@ -19,6 +21,9 @@
 		selected?: boolean;
 		/** The place the row stands for (a book's page): a real link, which the click still handles. */
 		href?: string;
+		/** A book's highlights and notes, as a small ring in the icon lane. */
+		marks?: Mark[];
+		title?: string;
 		onclick: (e: MouseEvent) => void;
 		/** A click on the chevron (when it does something other than the row). */
 		onchevron?: () => void;
@@ -36,6 +41,8 @@
 		disclosureOnHover = false,
 		selected = false,
 		href,
+		marks,
+		title,
 		onclick,
 		onchevron,
 		el = $bindable()
@@ -51,6 +58,7 @@
 		class={['row', 'follow', { selected }]}
 		aria-current={selected || undefined}
 		aria-expanded={disclosure}
+		{title}
 		use:follow={onclick}
 	>
 		{@render content()}
@@ -62,6 +70,7 @@
 		class={['row', { selected }]}
 		aria-current={selected || undefined}
 		aria-expanded={disclosure}
+		{title}
 		{onclick}
 	>
 		{@render content()}
@@ -69,7 +78,11 @@
 {/if}
 
 {#snippet content()}
-	{#if indent}<span style:width="{indent}px" class="indent"></span>{/if}
+	{#if indent}
+		<span style:width="{indent}px" class="indent">
+			{#if marks?.length}<Ring {marks} size={13} gap={1.75} cap={8} />{/if}
+		</span>
+	{/if}
 	{#if icon}<Icon name={icon} size={16} class={quietIcon ? 'lead quiet' : 'lead'} />{/if}
 	<span class="label">{label}</span>
 	{#if count !== undefined && count !== null}<span class="count">{count}</span>{/if}
@@ -120,7 +133,12 @@
 	}
 
 	.indent {
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		flex-shrink: 0;
+		/* A book's ring sits in the 16 pt icon lane. */
+		padding-right: 8px;
 		margin-right: -8px;
 	}
 
