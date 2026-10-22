@@ -464,6 +464,9 @@ also a static page that search engines can index.
   | none (chapters only, before) | 8,327 | 16,712 | 0.6 GB | 18 s |
   | **KJV, BSB, WEB** ✔ | 102,082 | 110,499 | 2.2 GB | about 2 min |
   | all seven | 226,471 | 234,892 | 4.2 GB | about 6 min |
+- **The site and the apps have different names.** The apps are "Bible" (`NAME`). The website is
+  "Simply My Bible" (`SITE_NAME`, at simplymybible.com). It ends every title and is `og:site_name`
+  and the WebSite's name in the JSON-LD.
 - **Hydration never shows a wrong layout.** The first client render matches the server's.
   Saved settings are applied after mount. An inline script in `app.html` sets the theme and
   accent before the first paint. When saved settings change the typesetting (verse per line,

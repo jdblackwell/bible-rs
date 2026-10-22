@@ -1,6 +1,6 @@
 <!-- A reader page's <head>: title, description, canonical address, link previews and JSON-LD. -->
 <script lang="ts">
-	import { NAME, SITE_URL } from '#lib/config.js';
+	import { SITE_NAME, SITE_URL } from '#lib/config.js';
 	import { jsonLd, type PageMeta } from './meta';
 
 	interface Props extends PageMeta {
@@ -20,7 +20,7 @@
 	<meta name="description" content={description} />
 	<link rel="canonical" href={url} />
 	<meta property="og:type" content={type} />
-	<meta property="og:site_name" content={NAME} />
+	<meta property="og:site_name" content={SITE_NAME} />
 	<meta property="og:title" content={title} />
 	<meta property="og:description" content={description} />
 	<meta property="og:url" content={url} />
