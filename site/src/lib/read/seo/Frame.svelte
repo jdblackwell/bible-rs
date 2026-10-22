@@ -55,7 +55,7 @@
 		{@render children()}
 	</main>
 	<footer class="foot">
-		{#each [notice ?? []].flat() as n (n)}<p>{n}</p>{/each}
+		{#each [notice ?? []].flat() as n, i (i)}<p>{n}</p>{/each}
 		<p class="links">
 			<a href="/">{NAME} for Mac</a>
 			<a href="/read">Web reader</a>

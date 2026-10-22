@@ -6,7 +6,6 @@
  * links to the topics that list it.
  */
 import type { VerseRef } from '#lib/read/core.js';
-import data from './topics.json';
 
 export interface TopicVerse {
 	/** "John 3:16", "Psalm 23:4". */
@@ -40,8 +39,6 @@ export interface Topic {
 	verses: TopicVerse[];
 }
 
-export const TOPICS: Topic[] = data;
-
 /** The translations a topic page prints each verse in (its title says "KJV & BSB"). */
 export const TOPIC_TRANSLATIONS = ['kjv', 'bsb'];
 
@@ -52,13 +49,31 @@ export const topicPath = (slug: string) => `${TOPICS_PATH}/${slug}`;
 export const topicName = (t: Topic) => t.topic[0].toUpperCase() + t.topic.slice(1);
 
 const key = (v: VerseRef) => `${v.book}:${v.chapter}:${v.verse}`;
-const byVerse = new Map<string, Topic[]>();
-for (const t of TOPICS) {
-	for (const v of t.verses) {
-		const k = key({ book: v.book_index, chapter: v.chapter, verse: v.verse });
-		byVerse.set(k, [...(byVerse.get(k) ?? []), t]);
-	}
+
+let read: Promise<{ list: Topic[]; byVerse: Map<string, Topic[]> }> | undefined;
+
+/**
+ * topics.json, on the server only. The pages that use it have no client-side code, and keeping the
+ * file out of the client's scripts keeps it out of what the reader's service worker caches.
+ */
+function data() {
+	read ??= (async () => {
+		const byVerse = new Map<string, Topic[]>();
+		if (!import.meta.env.SSR) return { list: [], byVerse };
+		const list: Topic[] = (await import('./topics.json')).default;
+		for (const t of list) {
+			for (const v of t.verses) {
+				const k = key({ book: v.book_index, chapter: v.chapter, verse: v.verse });
+				byVerse.set(k, [...(byVerse.get(k) ?? []), t]);
+			}
+		}
+		return { list, byVerse };
+	})();
+	return read;
 }
 
+/** Every topic, in topics.json's order. */
+export const topics = async () => (await data()).list;
+
 /** The topics that list a verse, in topics.json's order. */
-export const topicsWith = (v: VerseRef): Topic[] => byVerse.get(key(v)) ?? [];
+export const topicsWith = async (v: VerseRef) => (await data()).byVerse.get(key(v)) ?? [];
