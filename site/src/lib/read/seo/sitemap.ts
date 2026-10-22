@@ -5,7 +5,7 @@
  * carries the build's date.
  */
 import { SITE_URL } from '#lib/config.js';
-import { TOPICS, TOPICS_PATH, topicPath } from '#lib/topics/index.js';
+import { TOPICS_PATH, topicPath, topics } from '#lib/topics/index.js';
 import { bookPath, translationPath } from '../books';
 import { core } from '../core';
 import { bookPages, chapterPagePath, chapterPages, versePagePath, versePages } from './pages';
@@ -54,7 +54,7 @@ async function list(): Promise<Sitemap[]> {
 			out.push({ file: `verses-${t}-${i + 1}.xml`, paths: paths.slice(i * VERSES_PER_FILE, (i + 1) * VERSES_PER_FILE) });
 		}
 	}
-	out.push({ file: 'topics.xml', paths: [TOPICS_PATH, ...TOPICS.map((t) => topicPath(t.slug))] });
+	out.push({ file: 'topics.xml', paths: [TOPICS_PATH, ...(await topics()).map((t) => topicPath(t.slug))] });
 	return out;
 }
 

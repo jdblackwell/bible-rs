@@ -4,7 +4,7 @@ import { bookSlug } from '#lib/read/books.js';
 import { core } from '#lib/read/core.js';
 import { runsText } from '#lib/read/seo/meta.js';
 import { verseHref } from '#lib/read/seo/pages.js';
-import { TOPIC_TRANSLATIONS, TOPICS, TOPICS_PATH, topicName, topicPath } from '#lib/topics/index.js';
+import { TOPIC_TRANSLATIONS, TOPICS_PATH, topicName, topicPath, topics } from '#lib/topics/index.js';
 import type { EntryGenerator, PageLoad } from './$types';
 
 /**
@@ -15,10 +15,11 @@ import type { EntryGenerator, PageLoad } from './$types';
 export const prerender = true;
 export const csr = false;
 
-export const entries: EntryGenerator = () => TOPICS.map(({ slug }) => ({ slug }));
+export const entries: EntryGenerator = async () => (await topics()).map(({ slug }) => ({ slug }));
 
 export const load: PageLoad = async ({ params }) => {
-	const topic = TOPICS.find((t) => t.slug === params.slug);
+	const all = await topics();
+	const topic = all.find((t) => t.slug === params.slug);
 	if (!topic) error(404, 'No such topic');
 	// Anything in the file the core disagrees with stops the build rather than printing a wrong or
 	// empty verse. validate.mjs checks the same things; this is for an edit that skipped it.
@@ -57,7 +58,7 @@ export const load: PageLoad = async ({ params }) => {
 		translations: translations.map((t) => ({ id: t.id, abbrev: t.abbrev, name: t.name, copyright: t.copyright })),
 		verses,
 		related: topic.related.map((slug) => {
-			const r = TOPICS.find((t) => t.slug === slug);
+			const r = all.find((t) => t.slug === slug);
 			if (!r) throw wrong(`its related topic "${slug}" doesn't exist`);
 			return { name: topicName(r), href: topicPath(slug) };
 		})

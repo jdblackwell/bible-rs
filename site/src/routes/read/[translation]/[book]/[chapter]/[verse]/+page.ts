@@ -92,7 +92,7 @@ export const load: PageLoad = async ({ params }) => {
 				href: v ? verseHref(c.books, t.id, index, verse.number) : chapterPath(c.books, t.id, index)
 			};
 		}),
-		topics: topicsWith(ref).map((t) => ({ name: topicName(t), href: topicPath(t.slug) })),
+		topics: (await topicsWith(ref)).map((t) => ({ name: topicName(t), href: topicPath(t.slug) })),
 		copy: c.copyText(id, [ref], 'reference') ?? `${text} — ${label} (${info.abbrev})`,
 		// Opens the Mac app at the verse: its bible:// links take a reference as the jump field does.
 		app: `bible://${encodeURI(label)}?translation=${id}`
