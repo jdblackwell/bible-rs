@@ -5,7 +5,8 @@
 //
 // It starts from the prerendered page and follows the build's Vite manifest: each file's imports,
 // dynamic imports and styles, then the fonts and images those name. Of SvelteKit's route nodes it
-// takes only the page's own, since the app never navigates to another route.
+// takes the page's own and the root error page's (node 1), which the client loads before it
+// hydrates any page; the app never navigates to another route.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,7 +28,9 @@ const html = readFileSync(join(pages, PAGE), 'utf8');
 /** Paths from the site's root, without the leading slash. */
 const files = new Set([PAGE]);
 const pending = [...html.matchAll(/(?:\.\.\/)+(_app\/immutable\/[^"'\s)]+)/g)].map((m) => m[1]);
-// The page's own nodes, as SvelteKit's boot script names them.
+// The page's own nodes, as SvelteKit's boot script names them, and the root layout's and error
+// page's (0 and 1), which start() imports before it hydrates.
+for (const [key, m] of Object.entries(manifest)) if (/\/nodes\/[01]\.js$/.test(key)) pending.push(m.file);
 const nodes = new Set(pending.filter((f) => f.includes('/nodes/')));
 
 while (pending.length) {
