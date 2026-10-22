@@ -88,7 +88,7 @@ const STEP = 2.1;
 
 const ease = (x: number) => 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3);
 
-/** A part's number from the spec, which check.mjs has made sure is there. */
+/** A part's number from the spec, which check.mjs has made sure is there (its SCENE table). */
 function dim(part: Part | undefined, key: string): number {
 	const d = part?.dims[key];
 	if (!d) throw new Error(`objects: ${part?.id ?? '?'} has no ${key}`);
@@ -605,8 +605,8 @@ export function createScene(
 		}
 	}
 
-	const watch = new IntersectionObserver(([entry]) => {
-		visible = entry.isIntersecting && document.visibilityState === 'visible';
+	const watch = new IntersectionObserver((entries) => {
+		visible = !!entries.at(-1)?.isIntersecting && document.visibilityState === 'visible';
 		if (visible) wake();
 	});
 	watch.observe(stage);
@@ -618,8 +618,15 @@ export function createScene(
 	const sizes = new ResizeObserver(() => wake());
 	sizes.observe(stage);
 
+	// iOS drops a backgrounded page's context. Ask for it back, then light the gold again: the
+	// environment map lived in the lost context.
 	const lost = (e: Event) => e.preventDefault();
+	const restored = () => {
+		scene.environment = new PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+		wake();
+	};
 	el.addEventListener('webglcontextlost', lost);
+	el.addEventListener('webglcontextrestored', restored);
 
 	// ------------------------------------------------------------------ start
 	applyInside();
@@ -690,6 +697,7 @@ export function createScene(
 			el.removeEventListener('pointerdown', onDown);
 			el.removeEventListener('pointerup', onUp);
 			el.removeEventListener('webglcontextlost', lost);
+			el.removeEventListener('webglcontextrestored', restored);
 			controls.dispose();
 			scene.traverse((o) => {
 				const m = o as Mesh;

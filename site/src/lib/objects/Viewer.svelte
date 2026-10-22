@@ -74,7 +74,10 @@
 	const linkFor = (ref: string) => verseLink(ref, texts.verses[ref] && listed.includes(texts.id) ? texts.id : 'kjv');
 
 	async function useTranslation(id: string) {
-		if (id === texts.id) return;
+		if (id === texts.id) {
+			missing = null;
+			return;
+		}
 		const t = id === 'kjv' ? kjv : await textsIn(id, versesUrl, refs, imported);
 		if (t) {
 			texts = t;
@@ -88,19 +91,8 @@
 
 	function pick(id: string | null) {
 		selected = id === selected ? null : id;
-		scene?.select(selected);
-		if (selected === 'cherubim' && !closeUp) setCloseUp(true);
-		if (selected === 'testimony' && !inside) setInside(true);
-	}
-
-	function setCloseUp(on: boolean) {
-		closeUp = on;
-		scene?.setCloseUp(on);
-	}
-
-	function setInside(on: boolean) {
-		inside = on;
-		scene?.setInside(on);
+		if (selected === 'cherubim') closeUp = true;
+		if (selected === 'testimony') inside = true;
 	}
 
 	function build() {
@@ -110,7 +102,7 @@
 			return;
 		}
 		selected = null;
-		if (closeUp) setCloseUp(false);
+		closeUp = false;
 		scene.build();
 		building = true;
 	}
@@ -125,7 +117,7 @@
 	function keydown(e: KeyboardEvent) {
 		if (e.key !== 'Escape' || e.defaultPrevented) return;
 		if (selected) pick(null);
-		else if (closeUp) setCloseUp(false);
+		else if (closeUp) closeUp = false;
 		else if (embed && inApp()) (window as unknown as { ipc: { postMessage(s: string): void } }).ipc.postMessage(JSON.stringify({ type: 'close' }));
 	}
 
@@ -201,10 +193,11 @@
 				// "Build from the text" plays once, the first time the model is in view.
 				if (!reducedMotion)
 					autoplay = new IntersectionObserver(
-						([entry]) => {
-							if (!entry.isIntersecting) return;
+						(entries) => {
+							if (!entries.at(-1)?.isIntersecting) return;
 							autoplay?.disconnect();
-							build();
+							// Not over something the reader already started or chose.
+							if (!scene?.building && !selected && !closeUp && !inside) build();
 						},
 						{ threshold: 0.6 }
 					);
@@ -227,6 +220,19 @@
 	$effect(() => {
 		const on = person;
 		scene?.setPerson(on);
+	});
+	// Also what was chosen before the scene loaded, once it has.
+	$effect(() => {
+		const on = inside;
+		scene?.setInside(on);
+	});
+	$effect(() => {
+		const on = closeUp;
+		scene?.setCloseUp(on);
+	});
+	$effect(() => {
+		const id = selected;
+		scene?.select(id);
 	});
 	$effect(() => {
 		for (const [key, choice] of Object.entries(choices)) {
@@ -290,8 +296,8 @@
 		/>
 		<div class="switches">
 			<label><Toggle label="Person for scale" bind:checked={person} /> Person for scale</label>
-			<label><Toggle label="See inside" checked={inside} onchange={setInside} /> See inside</label>
-			<label><Toggle label="Close-up" checked={closeUp} onchange={setCloseUp} /> Close-up</label>
+			<label><Toggle label="See inside" bind:checked={inside} /> See inside</label>
+			<label><Toggle label="Close-up" bind:checked={closeUp} /> Close-up</label>
 		</div>
 	</div>
 

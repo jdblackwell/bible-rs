@@ -61,7 +61,7 @@
 		gold cherubim on the lid.
 	</p>
 
-	<div class="wide">
+	<div class="wide" id="model">
 		<Viewer
 			spec={data.spec}
 			cubits={data.cubits}

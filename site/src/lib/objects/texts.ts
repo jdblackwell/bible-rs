@@ -22,15 +22,21 @@ export function readerTranslation(): string | null {
 	}
 }
 
-let fetched: Promise<VerseTexts[]> | undefined;
+/** By address: the web's one file, or the app's answer for each translation it's asked for. */
+const fetched = new Map<string, Promise<VerseTexts[]>>();
 
 /** Every translation verses.json has (in the app: the app's translation, then the KJV). */
 export function available(url: string, translation: string): Promise<VerseTexts[]> {
-	fetched ??= fetch(inApp() ? `${url}?translation=${encodeURIComponent(translation)}` : url)
-		.then((r) => (r.ok ? r.json() : { translations: [] }))
-		.then((j: { translations: VerseTexts[] }) => j.translations)
-		.catch(() => []);
-	return fetched;
+	const address = inApp() ? `${url}?translation=${encodeURIComponent(translation)}` : url;
+	let list = fetched.get(address);
+	if (!list) {
+		list = fetch(address)
+			.then((r) => (r.ok ? r.json() : { translations: [] }))
+			.then((j: { translations: VerseTexts[] }) => j.translations)
+			.catch(() => []);
+		fetched.set(address, list);
+	}
+	return list;
 }
 
 /** Reads the cited verses from a translation imported into this browser's reader (imported.ts). */

@@ -16,6 +16,27 @@ export const QUOTED = ['kjv', 'bsb'];
 export const GENERATORS = ['chest', 'crown', 'rings', 'poles', 'tablets', 'slab', 'cherub', 'glow'];
 
 /**
+ * What lib/objects/scene.ts reads from each object it draws: every part by id, with these dims,
+ * and these options with a number each choice sets. A spec without them would pass its schema
+ * and then fail to draw.
+ */
+export const SCENE = {
+	ark: {
+		parts: {
+			chest: ['length', 'breadth', 'height', 'gold'],
+			crown: ['height', 'thickness'],
+			rings: ['radius', 'thickness', 'inset'],
+			poles: ['length', 'radius'],
+			testimony: ['width', 'height', 'thickness'],
+			'mercy-seat': ['length', 'breadth', 'thickness'],
+			cherubim: ['height', 'inset'],
+			presence: []
+		},
+		options: { 'rings.position': 'height' }
+	}
+};
+
+/**
  * @typedef {{ index: number; abbrev: string; chapters: number }} Book
  * @typedef {{ book: number; chapter: number; verse: number }} VerseRef
  * @typedef {(translation: string, ref: VerseRef) => string | null} VerseText
@@ -123,6 +144,22 @@ export function check({ name, spec, cubits, schemas, books, text }) {
 			for (const c of o.choices) dims(`${at}.options.${o.id}.${c.id}`, c.values);
 		}
 	}
+	const scene = /** @type {Record<string, { parts: Record<string, string[]>; options: Record<string, string> }>} */ (SCENE)[spec.id];
+	if (!scene) problems.push(`${name}: scene.ts has no model for "${spec.id}" (add it to SCENE in check.mjs once it does)`);
+	else {
+		for (const [id, keys] of Object.entries(scene.parts)) {
+			const part = spec.parts.find((/** @type {any} */ p) => p.id === id);
+			if (!part) problems.push(`${name}: scene.ts draws a part "${id}", which the spec doesn't have`);
+			else for (const k of keys) if (!part.dims[k]) problems.push(`${name}: ${id}: scene.ts needs its "${k}"`);
+		}
+		for (const p of spec.parts) if (!scene.parts[p.id]) problems.push(`${name}: ${p.id}: scene.ts doesn't draw a part with this id`);
+		for (const [key, value] of Object.entries(scene.options)) {
+			const [id, option] = key.split('.');
+			const o = spec.parts.find((/** @type {any} */ p) => p.id === id)?.options?.find((/** @type {any} */ x) => x.id === option);
+			if (!o) problems.push(`${name}: ${id}: scene.ts needs the option "${option}"`);
+			else for (const c of o.choices) if (!c.values[value]) problems.push(`${name}: ${id}.options.${option}.${c.id}: scene.ts needs its "${value}"`);
+		}
+	}
 	spec.assembly.forEach((/** @type {any} */ step, /** @type {number} */ i) => {
 		const at = `${name}: assembly[${i}]`;
 		if (!ids.has(step.part)) problems.push(`${at}: no part called "${step.part}"`);
@@ -167,6 +204,8 @@ async function main() {
 	if (failed) process.exit(1);
 }
 
-if (typeof process !== 'undefined' && process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
-	await main();
+if (typeof process !== 'undefined' && process.argv[1]) {
+	const { realpathSync } = await import('node:fs');
+	const { pathToFileURL } = await import('node:url');
+	if (pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url) await main();
 }
