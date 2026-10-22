@@ -20,13 +20,16 @@ export const load: PageLoad = async ({ params }) => {
 	const c = await core();
 	const info = await c.load(TRANSLATION);
 	const passages = topic.passages.map((reference) => {
+		// A typo in the file stops the build rather than printing an empty or shortened passage.
+		const wrong = (why: string) => new Error(`topics.json: "${reference}" (${topic.slug}) ${why}`);
 		const ref = parseReference(reference);
-		// A typo in the file stops the build rather than printing an empty passage.
-		if (!ref) throw new Error(`topics.json: "${reference}" (${topic.slug}) isn't a reference`);
-		const last = ref.verseEnd ?? ref.verse;
-		const verses = c
-			.verses(TRANSLATION, ref.chapterIndex)
-			.filter((v) => ref.verse === null || (v.number >= ref.verse && v.number <= last!));
+		if (!ref) throw wrong(`isn't a reference`);
+		const chapter = c.verses(TRANSLATION, ref.chapterIndex);
+		const first = ref.verse ?? chapter[0]?.number;
+		const last = ref.verseEnd ?? ref.verse ?? chapter.at(-1)?.number;
+		const has = (n: number | undefined) => chapter.some((v) => v.number === n);
+		if (!has(first) || !has(last) || last! < first!) throw wrong(`names verses the ${info.abbrev} doesn't have`);
+		const verses = chapter.filter((v) => v.number >= first! && v.number <= last!);
 		return {
 			label: ref.label,
 			href: ref.verse
