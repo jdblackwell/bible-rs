@@ -5,6 +5,7 @@
 -->
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { glyphsIn, type Glyph } from '../../objects/glyphs';
 	import type { Block, ChapterContent, HighlightColor, Run, VerseMarks } from '../core';
 	import Icon from '../ui/Icon.svelte';
 	import { runClass, segments, washes, type Piece, type Wash } from './segments';
@@ -52,6 +53,18 @@
 		if (content?.status.type !== 'ready') return [];
 		const seen = new Set<number>();
 		return content.blocks.map((block) => ({ block, segs: segments(block, seen) }));
+	});
+
+	/** Verses that describe a modelled object (the Ark), by verse. */
+	const glyphs = $derived(glyphsIn(index));
+	/** Where each of those verses ends ("block:segment"): its glyph follows its last words. */
+	const glyphAt = $derived.by(() => {
+		const at = new Map<string, Glyph>();
+		if (!glyphs) return at;
+		const last = new Map<number, string>();
+		blocks.forEach(({ segs }, i) => segs.forEach((s, j) => glyphs.has(s.verse) && last.set(s.verse, `${i}:${j}`)));
+		for (const [verse, key] of last) at.set(key, glyphs.get(verse)!);
+		return at;
 	});
 
 	const message = $derived(
@@ -170,7 +183,13 @@
 								class:flash={flash === seg.verse}
 								style:--hl={hl(whole(ws))}
 								>{@render text(ws)}</span
-							>{seg.trail}</span
+							>{#if glyphAt.get(`${i}:${j}`)}{@const g = glyphAt.get(`${i}:${j}`)!}<a
+									class="glyph"
+									href={g.href}
+									data-sveltekit-reload
+									title={g.label}
+									aria-label={g.label}><Icon name="cube" size={18} /></a
+								>{/if}{seg.trail}</span
 						>{/if}{/each}</p>
 		{/each}
 		{@render footer?.()}
@@ -430,6 +449,24 @@
 	}
 
 	.marker.open {
+		background: var(--accent-soft);
+	}
+
+	/* An object modelled in 3D: an 18 pt cube after the verse, in the accent colour. */
+	.glyph {
+		display: inline-grid;
+		place-items: center;
+		width: 24px;
+		height: 24px;
+		margin-left: 2px;
+		border-radius: 6px;
+		vertical-align: -5px;
+		color: var(--accent);
+		text-indent: 0;
+		transition: background-color var(--motion-fast);
+	}
+
+	.glyph:hover {
 		background: var(--accent-soft);
 	}
 </style>
