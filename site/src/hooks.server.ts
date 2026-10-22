@@ -1,6 +1,7 @@
 import type { Handle } from '@sveltejs/kit/hooks';
 
-const reader = (path: string) => path === '/read' || path.startsWith('/read/') || path.startsWith('/topics/');
+const reader = (path: string) =>
+	path === '/read' || path.startsWith('/read/') || path === '/topics' || path.startsWith('/topics/');
 
 /**
  * Reader pages (and the topic pages, set like them) carry the reader's default appearance in the

@@ -13,7 +13,7 @@ export const MIN_MACOS = '11';
 export const NAME = 'Bible';
 /**
  * The website's name. Every page's title ends with it, and it is og:site_name and the WebSite's
- * name in the JSON-LD.
+ * name in the JSON-LD. src/lib/topics/build.mjs reads it from here for the topic pages' titles.
  */
 export const SITE_NAME = 'Simply My Bible';
 export const REPO_URL = 'https://github.com/michaelshimeles/bible-rs';

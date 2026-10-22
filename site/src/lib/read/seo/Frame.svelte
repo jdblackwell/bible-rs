@@ -8,6 +8,7 @@
 	import type { Snippet } from 'svelte';
 	import { analyticsTag } from '#lib/analytics.js';
 	import { NAME } from '#lib/config.js';
+	import { TOPICS_PATH } from '#lib/topics/index.js';
 	import { AppIcon, Icon } from '../ui';
 	import type { Crumb } from './meta';
 
@@ -15,8 +16,8 @@
 		crumbs: Crumb[];
 		/** Where the button at the top opens the reader, and what it says ("Read John 3"). */
 		reader: { href: string; label: string };
-		/** The small print at the foot: the translation's copyright. */
-		notice?: string;
+		/** The small print at the foot: the translation's copyright, or each translation's. */
+		notice?: string | string[];
 		children: Snippet;
 	}
 
@@ -54,10 +55,11 @@
 		{@render children()}
 	</main>
 	<footer class="foot">
-		{#if notice}<p>{notice}</p>{/if}
+		{#each [notice ?? []].flat() as n (n)}<p>{n}</p>{/each}
 		<p class="links">
 			<a href="/">{NAME} for Mac</a>
 			<a href="/read">Web reader</a>
+			<a href={TOPICS_PATH}>Verses by topic</a>
 			<a href="/privacy">Privacy</a>
 		</p>
 	</footer>
