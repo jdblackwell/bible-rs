@@ -281,8 +281,11 @@ pub struct BibleApp {
     toolbar_items: Vec<egui::Rect>,
     #[cfg(target_os = "macos")]
     no_drag: crate::macos_window::NoDragAreas,
-    #[cfg(target_os = "macos")]
-    menu: Option<crate::macos_menu::AppMenu>,
+    #[cfg(any(target_os = "macos", windows))]
+    menu: Option<crate::menu_bar::AppMenu>,
+    /// Windows: whether the window had the focus last frame.
+    #[cfg(windows)]
+    was_focused: bool,
 }
 
 /// Toolbar geometry for the current frame.
@@ -404,9 +407,17 @@ impl BibleApp {
             toolbar_items: Vec::new(),
             #[cfg(target_os = "macos")]
             no_drag: Default::default(),
-            settings,
             #[cfg(target_os = "macos")]
             menu: if crate::offscreen() { None } else { crate::macos_menu::AppMenu::install() },
+            #[cfg(windows)]
+            menu: if crate::offscreen() {
+                None
+            } else {
+                crate::windows_menu::AppMenu::install(cc, settings.theme == Theme::Dark)
+            },
+            #[cfg(windows)]
+            was_focused: false,
+            settings,
         }
     }
 
@@ -1527,7 +1538,7 @@ impl BibleApp {
             let chord = crate::keymap::ALL
                 .iter()
                 .find(|s| s.id == "focus")
-                .map(|s| crate::keymap::keycaps(s, &self.settings.shortcuts).concat())
+                .map(|s| crate::keymap::caps_label(&crate::keymap::keycaps(s, &self.settings.shortcuts)))
                 .unwrap_or_default();
             let hint = format!("Exit Focus {chord}");
             let hint_w = ui
@@ -1732,7 +1743,7 @@ impl BibleApp {
             crate::keymap::ALL
                 .iter()
                 .find(|s| s.id == id)
-                .map(|s| crate::keymap::keycaps(s, &self.settings.shortcuts).concat())
+                .map(|s| crate::keymap::caps_label(&crate::keymap::keycaps(s, &self.settings.shortcuts)))
                 .unwrap_or_default()
         };
         let sidebar = if self.settings.sidebar_open { "Hide Sidebar" } else { "Show Sidebar" };
@@ -2024,7 +2035,8 @@ fn sidebar_toggle(
     }
     let icon = egui::Rect::from_center_size(rect.center(), vec2(ICON, ICON));
     crate::icons::sidebar(ui.painter(), icon, p.ink_2.lerp_to_gamma(p.ink, capsule));
-    let resp = resp.on_hover_text(if open { "Hide sidebar (⌘B)" } else { "Show sidebar (⌘B)" });
+    let tip = if open { "Hide sidebar (⌘B)" } else { "Show sidebar (⌘B)" };
+    let resp = resp.on_hover_text(crate::keymap::shown(tip).as_ref());
     if resp.clicked() {
         actions.push(Action::ToggleSidebar);
     }
@@ -2036,7 +2048,8 @@ fn translation_menu(ui: &mut Ui, library: &Library, settings: &Settings, actions
     for (i, e) in library.entries().iter().enumerate() {
         let m = &e.meta;
         let current = m.id == settings.translation;
-        let shortcut = if i < 9 { format!("⌘{}", i + 1) } else { String::new() };
+        let shortcut =
+            if i < 9 { crate::keymap::shown(&format!("⌘{}", i + 1)).into_owned() } else { String::new() };
         let resp = ui.add(
             egui::Button::selectable(current, egui::RichText::new(format!("{}  {}", m.abbrev, m.name)))
                 .shortcut_text(shortcut),
@@ -2067,6 +2080,31 @@ fn translation_menu(ui: &mut Ui, library: &Library, settings: &Settings, actions
     if ui.button("Manage translations…").clicked() {
         actions.push(Action::OpenSettings(SettingsTab::Translations));
         ui.close();
+    }
+}
+
+impl BibleApp {
+    /// Windows: the menu bar follows the app's theme (dark for Dark, light for Light and Sepia),
+    /// focus mode hides it, and onboarding greys out Focus Mode. egui gives the title bar the app's theme when that changes, but
+    /// winit puts it back to the system's whenever a system setting changes, so it is set again
+    /// when the window gets the focus back.
+    #[cfg(windows)]
+    fn match_window_chrome(&mut self, ctx: &egui::Context) {
+        if crate::offscreen() {
+            return;
+        }
+        let dark = self.settings.theme == Theme::Dark;
+        let focused = ctx.input(|i| i.focused);
+        if focused && !self.was_focused {
+            let theme = if dark { egui::SystemTheme::Dark } else { egui::SystemTheme::Light };
+            ctx.send_viewport_cmd(egui::ViewportCommand::SetTheme(theme));
+        }
+        self.was_focused = focused;
+        if let Some(menu) = &mut self.menu {
+            menu.set_dark(dark);
+            menu.set_shown(!self.focus);
+            menu.set_focus_enabled(self.onboarding.is_none());
+        }
     }
 }
 
@@ -2217,7 +2255,7 @@ impl eframe::App for BibleApp {
         if self.onboarding.is_none() {
             self.shortcuts(&ctx, &mut actions);
         }
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         if let Some(menu) = &self.menu {
             menu.poll(&mut actions);
         }
@@ -2239,6 +2277,8 @@ impl eframe::App for BibleApp {
                 actions.push(Action::SetTheme(t));
             }
         }
+        #[cfg(windows)]
+        self.match_window_chrome(&ctx);
         let p = self.settings.theme.palette();
 
         self.chrome = chrome(frame, &ctx);
@@ -2548,14 +2588,9 @@ impl eframe::App for BibleApp {
                 }
                 crate::share_sheet::Outcome::Close => self.share_sheet = None,
                 crate::share_sheet::Outcome::Toast(msg) => self.toast(&ctx, msg),
+                #[cfg(target_os = "macos")]
                 crate::share_sheet::Outcome::Share { path, anchor } => {
-                    #[cfg(target_os = "macos")]
                     crate::macos_window::share_file(frame, &path, anchor, ctx.zoom_factor());
-                    #[cfg(not(target_os = "macos"))]
-                    {
-                        let _ = anchor;
-                        self.toast(&ctx, format!("Saved the image to {}", path.display()));
-                    }
                 }
             }
         }
@@ -2606,14 +2641,57 @@ pub fn last_backup(data_dir: &std::path::Path) -> Option<(i64, u64)> {
 
 /// Opens a folder in the system's file browser.
 pub fn reveal(path: &std::path::Path) {
-    let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
-    let _ = std::process::Command::new(opener).arg(path).spawn();
+    #[cfg(windows)]
+    shell_open(path.as_os_str());
+    #[cfg(not(windows))]
+    {
+        let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+        let _ = std::process::Command::new(opener).arg(path).spawn();
+    }
 }
 
 /// Opens a web page in the browser.
 pub fn open_url(url: &str) {
-    let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
-    let _ = std::process::Command::new(opener).arg(url).spawn();
+    #[cfg(windows)]
+    shell_open(std::ffi::OsStr::new(url));
+    #[cfg(not(windows))]
+    {
+        let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+        let _ = std::process::Command::new(opener).arg(url).spawn();
+    }
+}
+
+/// Windows: opens a folder in File Explorer or a link in the default browser, as a double-click
+/// would.
+#[cfg(windows)]
+pub fn shell_open(target: &std::ffi::OsStr) {
+    use std::os::windows::ffi::OsStrExt;
+
+    use windows_sys::Win32::System::Com::{
+        COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize,
+    };
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    let wide: Vec<u16> = target.encode_wide().chain([0]).collect();
+    let open: Vec<u16> = "open".encode_utf16().chain([0]).collect();
+    // SAFETY: both strings are NUL-terminated and outlive the call. ShellExecute wants COM on the
+    // calling thread (the update check calls this from its own); a successful CoInitializeEx is
+    // balanced, one that finds COM already set up in another mode changes nothing.
+    unsafe {
+        let com =
+            CoInitializeEx(std::ptr::null(), (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32);
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            open.as_ptr(),
+            wide.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        );
+        if com >= 0 {
+            CoUninitialize();
+        }
+    }
 }
 
 pub fn online_counter() -> Arc<AtomicU64> {
