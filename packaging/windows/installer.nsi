@@ -2,6 +2,9 @@
 ; %LOCALAPPDATA%\Programs\Bible, with a Start menu shortcut and an entry in Settings > Apps.
 ; scripts/package-windows.sh builds it; WINDOWS.md says how to sign it.
 ;
+; The app updates itself by running this installer as `setup.exe /S /RELAUNCH /D=<its folder>`
+; and quitting: the installer waits for it to close, replaces it and opens it again.
+;
 ; Defines (makensis -D...):
 ;   VERSION    the app's version, 0.2.0
 ;   SRC        the folder holding bible-rs.exe and the licence files
@@ -58,17 +61,49 @@ VIAddVersionKey /LANG=1033 "LegalCopyright" "${COPYRIGHT}"
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
 
-; Windows won't replace a running program, so ask for the app to be closed first.
+; Windows won't replace a running program, so the app must be closed first. Run silently (as the
+; app's own update runs it, while the app quits), wait up to 30 seconds for that; otherwise ask.
 !macro WAIT_FOR_APP_TO_CLOSE
-  IfFileExists "$INSTDIR\${EXE}" 0 +7
+  StrCpy $1 0
+  app_open:
+  IfFileExists "$INSTDIR\${EXE}" 0 app_closed
     ClearErrors
     FileOpen $0 "$INSTDIR\${EXE}" a
-    IfErrors 0 +3
+    IfErrors 0 app_unlocked
+      IfSilent 0 ask_to_close
+        IntOp $1 $1 + 1
+        IntCmp $1 60 give_up 0 give_up
+        Sleep 500
+        Goto app_open
+      ask_to_close:
       MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "${NAME} is open. Close it, then choose Retry." \
-        /SD IDCANCEL IDRETRY -4
+        /SD IDCANCEL IDRETRY app_open
+      give_up:
       Abort
+    app_unlocked:
     FileClose $0
+  app_closed:
 !macroend
+
+; `/RELAUNCH` (the app's own update): open the app again once done, the new version or, if the
+; install failed, the one already there.
+Function RelaunchIfAsked
+  ${GetParameters} $0
+  ClearErrors
+  ${GetOptions} $0 "/RELAUNCH" $1
+  IfErrors done
+  IfFileExists "$INSTDIR\${EXE}" 0 done
+    Exec '"$INSTDIR\${EXE}"'
+  done:
+FunctionEnd
+
+Function .onInstSuccess
+  Call RelaunchIfAsked
+FunctionEnd
+
+Function .onInstFailed
+  Call RelaunchIfAsked
+FunctionEnd
 
 Section "Install"
   SetShellVarContext current

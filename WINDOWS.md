@@ -23,7 +23,8 @@ Uninstalling keeps your notes, highlights, settings and API keys, as dragging th
 Trash does.
 
 The installer also runs unattended: `bible-rs-<version>-windows-x64-setup.exe /S` installs
-silently, `/D=C:\Some\Folder` (last on the command line) picks the folder.
+silently, `/D=C:\Some\Folder` (last on the command line) picks the folder, and `/RELAUNCH` opens
+Bible when it is done. Run silently, it waits up to 30 seconds for an open Bible to close.
 
 ## Where things live
 
@@ -33,6 +34,7 @@ silently, `/D=C:\Some\Folder` (last on the command line) picks the folder.
 | Notes, highlights, bookmarks, settings (`study.sqlite`), imported translations, backups | `%APPDATA%\bible-rs` (or `BIBLE_RS_HOME`) |
 | API keys (ESV, API.Bible) | Windows Credential Manager, generic credentials named `<key>.bible-rs` |
 | Last update check | `%APPDATA%\bible-rs\update-check` |
+| A downloaded update's installer | `%LOCALAPPDATA%\bible-rs\updates`, deleted at the next launch |
 
 ## How it differs from the Mac app
 
@@ -42,7 +44,7 @@ silently, `/D=C:\Some\Folder` (last on the command line) picks the folder.
 | Menus | Menu bar at the top of the screen | Menu bar in the window: File, View, Go, Help. Alt and the underlined letters open it; focus mode hides it |
 | Shortcuts | ⌘K, ⇧⌘P… | Ctrl+K, Ctrl+Shift+P…, shown that way everywhere in the app. Focus mode is F11 (⌃⌘F on the Mac; ⌃ and ⌘ are the same Ctrl key on Windows) |
 | Share Verse | Share… opens the system share picker | Copy Image puts the card on the clipboard; Save Image… saves a PNG |
-| Updates | Sparkle checks daily and installs | The app asks GitHub for the latest release once a day, and when you choose Help › Check for Updates…. If it's newer, it offers the installer (or the release page) in your browser. Nothing installs by itself |
+| Updates | Sparkle checks daily; Install Update installs and relaunches | The app asks GitHub for the latest release once a day, and when you choose Help › Check for Updates…. If it's newer, the app offers it; Update downloads the installer, checks it, installs it and reopens Bible ([Updates](#updates)) |
 | API keys | Keychain | Credential Manager |
 | Rendering | Metal | Direct3D 12 (Windows' software renderer if there is no GPU driver) |
 | Dark mode | "Match system appearance" follows macOS | Follows Settings › Personalization › Colors |
@@ -52,6 +54,30 @@ silently, `/D=C:\Some\Folder` (last on the command line) picks the folder.
 The command line works too (`bible-rs.exe search "love one another"`). The app is a windowed
 program, so in cmd and PowerShell the prompt comes back before the output appears; pipe it
 (`bible-rs.exe list | more`) to wait for it.
+
+## Updates
+
+The app updates itself from inside the app, with no browser:
+
+1. Once a day at launch, and whenever you choose Help › Check for Updates… (or Settings › About ›
+   Check for Updates…), it asks GitHub's API for the latest published release.
+2. When that release is newer, the app shows "Bible <version> is available" with **Update** and
+   **Later**.
+3. **Update** downloads `bible-rs-<version>-windows-x64-setup.exe` from the release and shows its
+   progress. The app takes the file only from
+   `https://github.com/michaelshimeles/bible-rs/releases/download/v<version>/`, over HTTPS,
+   redirects included. Before running it, the app checks two things. Its size must be the size
+   GitHub lists. Its SHA-256 must match every checksum the release gives for it: the one GitHub
+   lists for the file, and the one in the release's `bible-rs-<version>-windows-x64-SHA256SUMS.txt`.
+   The app needs at least one of the two and won't install a release that has neither. It deletes
+   a file that fails either check.
+4. The app starts the installer as `setup.exe /S /RELAUNCH /D=<the app's folder>` and quits. The
+   installer waits for the app to close, replaces it and opens the new version. If it can't (the app
+   is still open after 30 seconds), it opens the old one again.
+
+When something fails, the app says what happened in plain words and offers **Retry**. Only a copy
+that the installer set up, with `Uninstall Bible.exe` beside it, updates itself. Any other copy
+says that it can't.
 
 ## Build
 
@@ -155,10 +181,18 @@ hook, for example
 
 ### After signing
 
-To publish Windows builds, attach the installer to the release as
-`bible-rs-<version>-windows-x64-setup.exe`. The app's update check looks for an asset whose name
-ends in `-windows-x64-setup.exe` and offers the release page when there is none. The website's
-download page links only the Mac disk image today.
+To publish Windows builds, attach the installer and its checksum list to the release under the
+names `scripts/package-windows.sh` gives them (RELEASING.md, "Windows"):
+
+```sh
+gh run download <release run id> -n bible-rs-v<version>-windows-x64 -D dist
+gh release upload v<version> dist/bible-rs-<version>-windows-x64-setup.exe \
+  dist/bible-rs-<version>-windows-x64-SHA256SUMS.txt
+```
+
+Installed copies update only to a release that has `bible-rs-<version>-windows-x64-setup.exe`.
+When a newer release lacks it, Check for Updates… says that its Windows installer isn't ready yet.
+The website's download page links only the Mac disk image today.
 
 ## Known gaps
 
@@ -171,8 +205,11 @@ download page links only the Mac disk image today.
 - **No `bible://` links yet.** Opening `bible://` links in the app is still an open pull request
   (#19); once it lands, the installer can register the scheme for the current user
   (`HKCU\Software\Classes\bible`).
-- **Updates download, they don't install.** The app opens the new installer in the browser;
-  running it upgrades in place.
+- **No Windows release yet.** In-app updates need a published release with the installer
+  attached ([After signing](#after-signing)). Until then the app finds nothing to install.
+- **The installer's signature isn't checked yet.** The app checks the downloaded installer's size
+  and SHA-256 against the release. Once installers are signed, it should also check that the
+  signature names Fabrika LLC before running one.
 - **Drop-down menus stay light in dark mode.** The menu bar follows the theme; Windows draws the
   menus under it in its light style.
 - **Windows 10 before version 20H1** keeps a light title bar in the dark theme.

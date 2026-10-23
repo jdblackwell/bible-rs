@@ -538,7 +538,10 @@ impl BibleApp {
         let typing = ctx.egui_wants_keyboard_input();
         // The book picker takes the single keys (arrows, return, escape) while it's open.
         let picker = crate::book_picker::is_open(ctx);
-        let overlay = self.palette.is_some() || self.settings_ui.is_some() || self.shortcuts_open;
+        let overlay = self.palette.is_some()
+            || self.settings_ui.is_some()
+            || self.shortcuts_open
+            || crate::updater::sheet_open();
         // The rows of Settings › Shortcuts, with any chords chosen there.
         let bindings = crate::keymap::bindings(&self.settings.shortcuts);
         let anywhere = |a: &Action| matches!(a, Action::OpenPalette | Action::OpenSearch(_));
@@ -1029,7 +1032,7 @@ impl BibleApp {
                 }
             }
             Action::ShowShortcuts => self.shortcuts_open = !self.shortcuts_open,
-            Action::CheckForUpdates => crate::updater::check_for_updates(),
+            Action::CheckForUpdates => crate::updater::check_for_updates(true),
             Action::ScrollLines(n) => {
                 let lh = self.settings.typo.size * self.settings.typo.line_height;
                 self.reader.scroll_by(n * lh);
@@ -1158,6 +1161,9 @@ impl BibleApp {
                     s.record(arg);
                 }
             }
+            // `update:<state>` over the main window, `update-about:<state>` on the About page only.
+            "update" => crate::updater::demo(arg, true),
+            "update-about" => crate::updater::demo(arg, false),
             "settings" => actions.push(Action::OpenSettings(match arg {
                 "translations" => SettingsTab::Translations,
                 "data" => SettingsTab::Data,
@@ -1952,7 +1958,8 @@ impl BibleApp {
             || self.palette.is_some()
             || self.shortcuts_open
             || self.import_sheet.is_some()
-            || self.share_sheet.is_some();
+            || self.share_sheet.is_some()
+            || crate::updater::sheet_open();
         self.object_view.show(
             frame,
             ctx,
@@ -2333,7 +2340,7 @@ impl BibleApp {
             );
             self.library.warm(&ids);
             if !crate::offscreen() && !crate::probing() {
-                crate::updater::start();
+                crate::updater::start(ctx);
             }
             if self.startup.probe {
                 let presented = self.startup.t0.elapsed();
@@ -2762,6 +2769,11 @@ impl eframe::App for BibleApp {
                     crate::macos_window::share_file(frame, &path, anchor, ctx.zoom_factor());
                 }
             }
+        }
+        crate::update_ui::sheet(&ctx, p);
+        // The update's installer is running and waits for the app to quit.
+        if crate::updater::take_quit() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         self.shortcuts_help(&ctx, &mut actions);
         self.plan_reminder(&ctx);
