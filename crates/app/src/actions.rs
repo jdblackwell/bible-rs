@@ -72,6 +72,8 @@ pub enum Action {
     /// Copy the selected verses' text; `Copy` adds the reference.
     CopyText,
     Copy,
+    SelectVerseRange,
+    SelectWords,
     /// Open the verse menu at a point (a right-click on the selection).
     OpenVerseMenu(eframe::egui::Pos2),
     /// Make an image of the selected verses to share.

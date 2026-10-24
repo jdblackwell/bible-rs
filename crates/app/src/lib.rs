@@ -4,6 +4,7 @@
 //! library lets benchmarks and integration tests drive the layout engine directly.
 
 pub mod actions;
+pub mod adaptation;
 pub mod app;
 pub mod book_picker;
 pub mod cli;
@@ -201,10 +202,10 @@ pub fn run() -> eframe::Result {
         .expect("spawn init thread");
 
     let mut viewport = egui::ViewportBuilder::default()
-        .with_title("Bible")
+        .with_title(crate::adaptation::NAME)
         .with_app_id("bible-rs")
         .with_inner_size(if first_run { onboarding::SIZE } else { egui::vec2(1280.0, 800.0) })
-        .with_min_inner_size([620.0, 420.0]);
+        .with_min_inner_size([320.0, 240.0]);
     if in_app_bundle() {
         // The bundle's .icns is already the Dock icon; an empty icon stops eframe from decoding
         // and installing one at runtime during the first frame.

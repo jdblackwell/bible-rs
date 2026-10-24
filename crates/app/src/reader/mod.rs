@@ -99,6 +99,14 @@ struct Cached {
     provisional: Option<u64>,
 }
 
+#[derive(Default)]
+enum TouchSelection {
+    #[default]
+    Off,
+    Verses(VerseRef),
+    Text,
+}
+
 pub struct Reader {
     pub anchor: Anchor,
     cache: HashMap<ChapterIdx, Cached>,
@@ -116,6 +124,7 @@ pub struct Reader {
     words_in: String,
     /// A drag choosing words is under way.
     dragging_text: bool,
+    touch_selection: TouchSelection,
     /// Where each chapter painted this frame has its top-left corner, to find text under a point.
     painted: Vec<(ChapterIdx, Vec2)>,
     flash: Option<(VerseRef, f64)>,
@@ -162,6 +171,7 @@ impl Reader {
             text_selection: None,
             words_in: String::new(),
             dragging_text: false,
+            touch_selection: TouchSelection::Off,
             painted: Vec::new(),
             flash: None,
             pending_jump: None,
@@ -226,6 +236,17 @@ impl Reader {
         self.selection = Some(t.verses());
     }
 
+    pub fn begin_verse_range(&mut self) {
+        if let Some((first, _)) = self.selection {
+            self.text_selection = None;
+            self.touch_selection = TouchSelection::Verses(first);
+        }
+    }
+
+    pub fn begin_word_selection(&mut self) {
+        self.touch_selection = TouchSelection::Text;
+    }
+
     fn select(&mut self, v: VerseRef, extend: bool) {
         // Clicking the verse of chosen words selects it whole, rather than letting go of it.
         let words = self.text_selection.take().is_some();
@@ -241,6 +262,7 @@ impl Reader {
     pub fn set_selection(&mut self, v: Option<VerseRef>) {
         self.text_selection = None;
         self.selection = v.map(|v| (v, v));
+        self.touch_selection = TouchSelection::Off;
     }
 
     /// Moves a single-verse selection by `delta` verses (within the chapter, else across).
@@ -424,6 +446,18 @@ impl Reader {
         // Text runs under the toolbar, but clicks there belong to the toolbar (and the window).
         let below_toolbar = Rect::from_min_max(pos2(rect.left(), rect.top() + env.toolbar), rect.max);
         let resp = ui.interact(below_toolbar, id, Sense::click_and_drag());
+        // Phone compositors can deliver touches as mouse events. Small windows must
+        // support swiping even without egui touch events; Shift still selects words.
+        let touch_controls = ui.input(|i| i.has_touch_screen() || i.content_rect().width() < 900.0);
+        if self.selection.is_none() {
+            self.touch_selection = TouchSelection::Off;
+        }
+        let drag_scroll = touch_controls
+            && !matches!(self.touch_selection, TouchSelection::Text)
+            && !ui.input(|i| i.modifiers.shift);
+        if drag_scroll {
+            self.dragging_text = false;
+        }
         let layouts_before = self.layouts;
         let mut geom = Geometry::new(rect, env.typo, env.columns.len(), ui.pixels_per_point());
         // The first frame of a resize places the chapters as they were typeset. A slide's first
@@ -505,6 +539,9 @@ impl Reader {
         let mut dy = 0.0;
         if resp.hovered() || resp.contains_pointer() {
             dy -= ui.input(|i| i.smooth_scroll_delta.y);
+        }
+        if drag_scroll && resp.dragged_by(egui::PointerButton::Primary) {
+            dy -= ui.input(|i| i.pointer.delta().y);
         }
         if self.scroll_remaining.abs() > 0.5 {
             let step = self.scroll_remaining * 0.28;
@@ -809,7 +846,8 @@ impl Reader {
             ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
         }
         // Dragging across the text chooses words, from where the press was.
-        if resp.drag_started_by(egui::PointerButton::Primary)
+        if !drag_scroll
+            && resp.drag_started_by(egui::PointerButton::Primary)
             && let Some(origin) = ui.input(|i| i.pointer.press_origin())
             && let Some(at) = self.text_pos_at(origin, None)
         {
@@ -854,7 +892,15 @@ impl Reader {
                 // Shift-click carries chosen words on to the click.
                 self.select_text(t);
             } else if let Some(v) = hit {
-                self.select(v, shift);
+                if let TouchSelection::Verses(anchor) = self.touch_selection
+                    && anchor.book == v.book
+                    && anchor.chapter == v.chapter
+                {
+                    self.text_selection = None;
+                    self.selection = Some((anchor.min(v), anchor.max(v)));
+                } else {
+                    self.select(v, shift);
+                }
             } else {
                 self.set_selection(None);
             }
@@ -877,6 +923,68 @@ impl Reader {
         }
 
         self.paint_scrollbar(ui, &bar, &bar_resp, p, env);
+        if touch_controls && self.selection.is_some() {
+            self.touch_selection_bar(ui, rect, p, actions);
+        }
+    }
+
+    fn touch_selection_bar(
+        &mut self,
+        ui: &Ui,
+        rect: Rect,
+        p: &crate::theme::Palette,
+        actions: &mut Vec<Action>,
+    ) {
+        let Some((first, last)) = self.selection else { return };
+        egui::Area::new(Id::new("touch-selection-bar"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(pos2(rect.left() + 8.0, rect.bottom() - 112.0))
+            .show(ui.ctx(), |ui| {
+                egui::Frame::new()
+                    .fill(p.surface)
+                    .corner_radius(12.0)
+                    .stroke(Stroke::new(1.0, p.border))
+                    .inner_margin(10.0)
+                    .show(ui, |ui| {
+                        ui.set_width((rect.width() - 36.0).max(200.0));
+                        ui.style_mut().interaction.selectable_labels = false;
+                        ui.spacing_mut().interact_size.y = 44.0;
+                        let hint = match self.touch_selection {
+                            TouchSelection::Off => format!("{} · choose verses or words", first.display()),
+                            TouchSelection::Verses(_) => {
+                                format!("Verses {}–{} · tap the last verse", first.verse, last.verse)
+                            }
+                            TouchSelection::Text => "Drag over words · Done returns to scrolling".to_string(),
+                        };
+                        ui.label(egui::RichText::new(hint).size(12.0).color(p.ink));
+                        ui.horizontal(|ui| {
+                            if ui
+                                .add(
+                                    egui::Button::new("Verses")
+                                        .selected(matches!(self.touch_selection, TouchSelection::Verses(_))),
+                                )
+                                .clicked()
+                            {
+                                self.begin_verse_range();
+                            }
+                            if ui
+                                .add(
+                                    egui::Button::new("Text")
+                                        .selected(matches!(self.touch_selection, TouchSelection::Text)),
+                                )
+                                .clicked()
+                            {
+                                self.begin_word_selection();
+                            }
+                            if ui.button("Actions").clicked() {
+                                actions.push(Action::OpenVerseMenu(ui.next_widget_position()));
+                            }
+                            if ui.button("Done").clicked() {
+                                self.set_selection(None);
+                            }
+                        });
+                    });
+            });
     }
 
     /// The place in the text at `pt`: in a block of verse text under it. While words are being

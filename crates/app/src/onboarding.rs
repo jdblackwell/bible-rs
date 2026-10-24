@@ -77,6 +77,9 @@ impl Onboarding {
         let p = palette(ui.ctx());
         let full = ui.max_rect();
         ui.painter().rect_filled(full, 0.0, p.paper);
+        if full.width() < 900.0 || full.height() < 620.0 {
+            return self.compact(ui, p, library, settings, actions);
+        }
         steps(ui.painter(), p, full, self.step);
 
         let footer = Rect::from_min_max(pos2(full.left(), full.bottom() - FOOTER), full.max);
@@ -118,6 +121,141 @@ impl Onboarding {
             next = true;
         }
         if next {
+            if self.step == 0 {
+                self.step = 1;
+            } else {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Small windows use normal flow layout so text wraps and choices can be swiped.
+    /// Keep navigation outside the scroll area, including when the keyboard reduces height.
+    fn compact(
+        &mut self,
+        ui: &mut Ui,
+        p: &Palette,
+        library: &Library,
+        settings: &mut Settings,
+        actions: &mut Vec<Action>,
+    ) -> bool {
+        let full = ui.max_rect();
+        let footer =
+            Rect::from_min_max(pos2(full.left(), (full.bottom() - FOOTER).max(full.top())), full.max);
+        ui.painter().hline(footer.x_range(), footer.top(), Stroke::new(1.0, p.separator));
+        let mut next = ui.input(|i| i.key_pressed(egui::Key::Enter));
+        let mut back = self.step > 0 && ui.input(|i| i.key_pressed(egui::Key::Escape));
+        let button_width = widgets::primary_button_width(ui, "Continue", true);
+        let button = Rect::from_min_size(
+            pos2(footer.right() - 16.0 - button_width, footer.center().y - 22.0),
+            vec2(button_width, 44.0),
+        );
+        next |= widgets::primary_button(
+            ui,
+            p,
+            button,
+            "Continue",
+            Some(icons::arrow_right),
+            ui.id().with("continue"),
+        )
+        .clicked();
+        if self.step > 0 {
+            let button = Rect::from_min_size(
+                pos2(footer.left() + 16.0, footer.center().y - 22.0),
+                vec2(widgets::plain_button_width(ui, "Back"), 44.0),
+            );
+            back |= widgets::plain_button(ui, p, button, "Back", ui.id().with("back")).clicked();
+        }
+        let body = Rect::from_min_max(full.min, pos2(full.right(), footer.top()));
+        ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
+            ui.set_clip_rect(body);
+            // Setup text is descriptive; reserving drags for scrolling is essential on touch.
+            ui.style_mut().interaction.selectable_labels = false;
+            egui::ScrollArea::vertical()
+                .id_salt(("welcome-scroll", self.step))
+                .scroll_source(egui::scroll_area::ScrollSource {
+                    drag: egui::scroll_area::DragScroll::Always,
+                    ..Default::default()
+                })
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    egui::Frame::new().inner_margin(20.0).show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        ui.spacing_mut().item_spacing.y = 12.0;
+                        ui.spacing_mut().interact_size.y = 44.0;
+                        ui.label(
+                            egui::RichText::new(format!("{} of 2 · {}", self.step + 1, STEPS[self.step],))
+                                .color(p.accent),
+                        );
+                        if self.step == 0 {
+                            ui.heading("Welcome to Bible");
+                            ui.label("Read and search offline. Choose a translation to start with.");
+                            for id in OFFERED.iter().filter(|id| library.contains(id)) {
+                                let Some(entry) = library.get(id) else { continue };
+                                let label = format!("{} · {}", entry.meta.abbrev, entry.meta.name);
+                                if ui
+                                    .add_sized(
+                                        [ui.available_width(), 52.0],
+                                        egui::Button::new(label).selected(settings.translation == *id).wrap(),
+                                    )
+                                    .clicked()
+                                {
+                                    actions.push(Action::SetTranslation((*id).to_string()));
+                                }
+                                if let Some((_, verse)) = self
+                                    .samples
+                                    .as_ref()
+                                    .and_then(|s| s.john.iter().find(|(key, _)| key == id))
+                                {
+                                    ui.label(egui::RichText::new(verse).color(p.ink_2));
+                                }
+                            }
+                            ui.label("Public domain · works offline · more in Settings");
+                            ui.label(
+                                "Have a licensed translation? Import it or add an API key later in Settings.",
+                            );
+                        } else {
+                            ui.heading("How should it read?");
+                            ui.label("Choose a theme. You can change it later in Settings.");
+                            for (theme, label) in
+                                [(Theme::Light, "Light"), (Theme::Sepia, "Sepia"), (Theme::Dark, "Dark")]
+                            {
+                                if ui
+                                    .add_sized(
+                                        [ui.available_width(), 48.0],
+                                        egui::Button::new(label).selected(settings.theme == theme),
+                                    )
+                                    .clicked()
+                                {
+                                    settings.theme_system = false;
+                                    actions.push(Action::SetTheme(theme));
+                                }
+                                let (card, _) =
+                                    ui.allocate_exact_size(vec2(ui.available_width(), 160.0), Sense::hover());
+                                preview(
+                                    ui.painter(),
+                                    card,
+                                    theme.palette(),
+                                    settings.typo.size,
+                                    self.samples.as_ref(),
+                                );
+                            }
+                            ui.label("Text size");
+                            ui.add(
+                                egui::Slider::new(&mut settings.typo.size, 14.0..=32.0)
+                                    .step_by(1.0)
+                                    .suffix(" pt"),
+                            );
+                            ui.checkbox(&mut settings.theme_system, "Match system appearance");
+                        }
+                        ui.add_space(12.0);
+                    });
+                });
+        });
+        if back {
+            self.step = 0;
+        } else if next {
             if self.step == 0 {
                 self.step = 1;
             } else {

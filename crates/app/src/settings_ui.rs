@@ -507,6 +507,21 @@ impl SettingsUi {
         tx: &Sender<TaskResult>,
         import: &mut Option<(PathBuf, Option<String>)>,
     ) -> bool {
+        if ctx.input(|i| i.has_touch_screen() || i.content_rect().width() < 900.0) {
+            let screen = ctx.content_rect();
+            let mut open = true;
+            egui::Area::new(egui::Id::new("settings-phone"))
+                .order(egui::Order::Foreground)
+                .fixed_pos(screen.min)
+                .show(ctx, |ui| {
+                    ui.set_min_size(screen.size());
+                    ui.set_clip_rect(screen);
+                    ui.interact(screen, ui.id().with("backdrop"), Sense::click_and_drag());
+                    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(screen));
+                    open = self.phone_window(&mut child, library, settings, study, actions, tx, import);
+                });
+            return open;
+        }
         if crate::offscreen() {
             // A screenshot of the window: fill the main window with it.
             let screen = ctx.content_rect();
@@ -546,6 +561,107 @@ impl SettingsUi {
             self.window(&mut child, library, settings, study, actions, tx, import);
         });
         open
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn phone_window(
+        &mut self,
+        ui: &mut Ui,
+        library: &mut Library,
+        settings: &mut Settings,
+        study: &StudyStore,
+        actions: &mut Vec<Action>,
+        tx: &Sender<TaskResult>,
+        import: &mut Option<(PathBuf, Option<String>)>,
+    ) -> bool {
+        let rect = ui.max_rect();
+        let p = settings.theme.palette();
+        ui.painter().rect_filled(rect, 0.0, p.paper);
+        ui.style_mut().interaction.selectable_labels = false;
+        ui.spacing_mut().interact_size.y = 44.0;
+        let header = Rect::from_min_size(rect.min, vec2(rect.width(), 72.0));
+        let mut open = true;
+        ui.scope_builder(egui::UiBuilder::new().max_rect(header.shrink(12.0)), |ui| {
+            ui.horizontal(|ui| {
+                egui::ComboBox::from_id_salt("settings-section")
+                    .selected_text(format!("Settings · {}", self.title()))
+                    .width((rect.width() - 110.0).max(160.0))
+                    .show_ui(ui, |ui| {
+                        for (tab, label, _) in TABS {
+                            ui.selectable_value(&mut self.tab, tab, label);
+                        }
+                    });
+                if ui.button("Done").clicked() {
+                    open = false;
+                }
+            });
+        });
+        ui.painter().hline(header.x_range(), header.bottom(), Stroke::new(1.0, p.separator));
+        let body = Rect::from_min_max(pos2(rect.left(), header.bottom()), rect.max);
+        ui.scope_builder(egui::UiBuilder::new().max_rect(body), |ui| {
+            ui.set_clip_rect(body);
+            let responsive =
+                matches!(self.tab, SettingsTab::Reading | SettingsTab::Appearance | SettingsTab::About);
+            ScrollArea::new([!responsive, true])
+                .auto_shrink([false, false])
+                .id_salt(("phone-settings", self.title()))
+                .scroll_source(egui::scroll_area::ScrollSource {
+                    drag: egui::scroll_area::DragScroll::Always,
+                    ..Default::default()
+                })
+                .show(ui, |ui| {
+                    egui::Frame::new().inner_margin(16.0).show(ui, |ui| {
+                        ui.set_width(if responsive {
+                            (body.width() - 32.0).max(200.0)
+                        } else {
+                            WIDTH - 64.0
+                        });
+                        ui.spacing_mut().item_spacing.y = 12.0;
+                        ui.spacing_mut().slider_width = (ui.available_width() - 90.0).max(100.0);
+                        match self.tab {
+                            SettingsTab::Reading => phone_reading(ui, library, settings, actions),
+                            SettingsTab::Appearance => {
+                                phone_theme(ui, settings, actions);
+                                ui.checkbox(&mut settings.toolbar_translation, "Translation in toolbar");
+                                ui.checkbox(&mut settings.sidebar_attached, "Attached sidebar");
+                                let mut reduce_motion = settings.reduce_motion;
+                                if ui.checkbox(&mut reduce_motion, "Reduce motion").changed() {
+                                    actions.push(Action::SetReduceMotion(reduce_motion));
+                                }
+                                ui.checkbox(&mut settings.flash_jumps, "Flash verse after jumping");
+                                ui.label("Accent colour");
+                                ui.horizontal_wrapped(|ui| {
+                                    for accent in theme::Accent::ALL {
+                                        if ui
+                                            .selectable_label(settings.accent == accent, accent.label())
+                                            .clicked()
+                                        {
+                                            actions.push(Action::SetAccent(accent));
+                                        }
+                                    }
+                                });
+                                ui.label("Highlight names");
+                                settings.highlight_names.resize(6, String::new());
+                                for (i, colour) in bible_core::study::HighlightColor::ALL.iter().enumerate() {
+                                    ui.label(colour.name());
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut settings.highlight_names[i])
+                                            .desired_width(ui.available_width()),
+                                    );
+                                }
+                            }
+                            SettingsTab::Translations => {
+                                self.translations(ui, library, settings, actions, tx, import)
+                            }
+                            SettingsTab::Shortcuts => self.shortcuts(ui, settings),
+                            SettingsTab::Data => self.data(ui, library, settings, study, actions),
+                            SettingsTab::About => phone_about(ui),
+                        }
+                        ui.add_space(24.0);
+                    });
+                });
+        });
+        open && !ui.input(|i| i.key_pressed(egui::Key::Escape))
     }
 
     /// The window's content: title bar, tabs, then the tab's settings.
@@ -1292,6 +1408,56 @@ fn row_label(ui: &Ui, p: &Palette, r: Rect, label: &str, detail: Option<&str>) {
 /// Line length shown in characters; stored as the measure in ems (66 characters ≈ 32 em).
 const CHARS_PER_EM: f32 = 66.0 / 32.0;
 
+fn phone_theme(ui: &mut Ui, settings: &mut Settings, actions: &mut Vec<Action>) {
+    ui.label("Theme");
+    ui.horizontal_wrapped(|ui| {
+        for theme in Theme::ALL {
+            if ui.selectable_label(!settings.theme_system && settings.theme == theme, theme.label()).clicked()
+            {
+                settings.theme_system = false;
+                actions.push(Action::SetTheme(theme));
+            }
+        }
+    });
+    ui.checkbox(&mut settings.theme_system, "Match system appearance");
+}
+
+fn phone_reading(ui: &mut Ui, library: &Library, settings: &mut Settings, actions: &mut Vec<Action>) {
+    phone_theme(ui, settings, actions);
+    ui.separator();
+    ui.label("Font: Literata");
+    ui.label("Text size");
+    ui.add(egui::Slider::new(&mut settings.typo.size, 14.0..=32.0).step_by(1.0).suffix(" pt"));
+    ui.label("Line spacing");
+    ui.add(egui::Slider::new(&mut settings.typo.line_height, 1.3..=2.0).step_by(0.05));
+    ui.label("Line length");
+    let mut chars = (settings.typo.measure * CHARS_PER_EM).round();
+    if ui.add(egui::Slider::new(&mut chars, 45.0..=90.0).step_by(1.0).suffix(" ch")).changed() {
+        settings.typo.measure = chars / CHARS_PER_EM;
+    }
+    ui.separator();
+    ui.label("Verse layout");
+    ui.radio_value(&mut settings.typo.mode, Mode::Paragraph, "Paragraphs");
+    ui.radio_value(&mut settings.typo.mode, Mode::VersePerLine, "Verse per line");
+    ui.checkbox(&mut settings.typo.red_letters, "Words of Christ in red");
+    ui.checkbox(&mut settings.typo.verse_numbers, "Verse numbers");
+    ui.checkbox(&mut settings.typo.headings, "Section headings");
+    ui.checkbox(&mut settings.typo.justify, "Justify paragraphs");
+    ui.separator();
+    ui.label("Reading preview");
+    if let Ok(t) = library.load(&settings.translation)
+        && let Some(verse) = t.find(bible_core::VerseRef::new(bible_core::BookId(42), 1, 1))
+    {
+        ui.label(
+            RichText::new(verse.plain_text())
+                .font(FontId::new(settings.typo.size, theme::family(theme::SERIF))),
+        );
+    }
+    if ui.button("Reset reading defaults").clicked() {
+        settings.typo = Typography::default();
+    }
+}
+
 fn reading(ui: &mut Ui, library: &Library, settings: &mut Settings, actions: &mut Vec<Action>) {
     let p = settings.theme.palette();
 
@@ -1811,7 +1977,27 @@ fn icon_segmented(
 }
 
 /// About (frame 28): the app, its version, the translations' and fonts' licences.
+fn phone_about(ui: &mut Ui) {
+    ui.heading(crate::adaptation::NAME);
+    ui.label("based on bible-rs");
+    ui.label(format!("Community preview · {}", crate::adaptation::BUILD));
+    ui.label("Original project by Micky (michaelshimeles) and the bible-rs contributors.");
+    ui.hyperlink_to("Original bible-rs project", crate::adaptation::ORIGINAL);
+    ui.hyperlink_to("Starting fork: ForrestKnight/bible-rs", crate::adaptation::SOURCE_FORK);
+    ui.label(format!("Omalauncher adaptation and testing: {}", crate::adaptation::CONTRIBUTOR));
+    ui.label("An independent community build; no upstream endorsement is implied.");
+    ui.hyperlink_to("Omalauncher preview releases", crate::adaptation::RELEASES);
+    ui.separator();
+    ui.label("Code: MIT. Copyright © 2026 Micky (github.com/michaelshimeles). Full license notices are included with the package.");
+    ui.label("Literata and Inter: SIL Open Font License 1.1.");
+    ui.label("Bundled translations: public-domain editions; KJV has a Crown letters patent notice in the UK. World English Bible is a trademark of eBible.org. See the included translation provenance and notices.");
+    ui.label("Ark of the Covenant specs and 3D models © 2026 Micky (github.com/michaelshimeles) / bible-rs contributors, licensed CC BY 4.0, https://github.com/michaelshimeles/bible-rs");
+    ui.hyperlink_to("CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/");
+}
+
 fn about(ui: &mut Ui, p: &Palette) {
+    phone_about(ui);
+    ui.add_space(16.0);
     let width = ui.available_width();
     let (r, _) = ui.allocate_exact_size(vec2(width, 240.0), Sense::hover());
     let painter = ui.painter().clone();

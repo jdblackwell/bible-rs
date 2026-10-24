@@ -132,13 +132,27 @@ impl Pages {
             self.scrolled = false;
             return;
         }
-        let out = ScrollArea::vertical().id_salt(("page", self.page as u8)).auto_shrink(false).show(
-            &mut child,
-            |ui| {
+        let phone = ui.ctx().content_rect().width() < 900.0 || ui.input(|i| i.has_touch_screen());
+        if phone {
+            child.style_mut().interaction.selectable_labels = false;
+        }
+        let out = ScrollArea::vertical()
+            .id_salt(("page", self.page as u8))
+            .scroll_source(egui::scroll_area::ScrollSource {
+                drag: if phone {
+                    egui::scroll_area::DragScroll::Always
+                } else {
+                    egui::scroll_area::DragScroll::OnTouch
+                },
+                ..Default::default()
+            })
+            .auto_shrink(false)
+            .show(&mut child, |ui| {
                 let width = ui.available_width();
-                let left = ui.max_rect().left() + SIDE;
+                let side = if phone && self.page == Page::Bookmarks { 16.0 } else { SIDE };
+                let left = ui.max_rect().left() + side;
                 let top = ui.max_rect().top() + env.toolbar + TOP;
-                let content = Rect::from_min_size(pos2(left, top), vec2(width - 2.0 * SIDE, 0.0));
+                let content = Rect::from_min_size(pos2(left, top), vec2(width - 2.0 * side, 0.0));
                 let bottom = match self.page {
                     Page::Translations => self.translations.show(ui, content, env, actions),
                     Page::Bookmarks => self.bookmarks.show(ui, content, env, actions),
@@ -152,8 +166,7 @@ impl Pages {
                     Rect::from_min_max(ui.max_rect().min, pos2(ui.max_rect().right(), bottom + 40.0)),
                     egui::Sense::hover(),
                 );
-            },
-        );
+            });
         self.scrolled = out.state.offset.y > 0.5;
     }
 }

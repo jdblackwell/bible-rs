@@ -67,7 +67,8 @@ impl VerseMenu {
             item(icons::compare, "Compare Translations", "C", Some(Action::Compare)),
             item(icons::columns, "Open in Parallel", "⇧⌘P", Some(Action::ToggleParallel)),
             Line::Separator,
-            item(icons::text_cursor, "Select Verse Range", "⇧-click", None),
+            item(icons::text_cursor, "Select Verse Range", "", Some(Action::SelectVerseRange)),
+            item(icons::text_cursor, "Select Words", "", Some(Action::SelectWords)),
         ]
     }
 

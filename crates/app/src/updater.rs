@@ -9,7 +9,11 @@
 //! for Updates…" is chosen, and offers its installer (or its page) when it is newer (WINDOWS.md).
 
 /// The project's releases on GitHub.
-pub const RELEASES: &str = "https://github.com/michaelshimeles/bible-rs/releases";
+pub const RELEASES: &str = if cfg!(target_os = "linux") {
+    crate::adaptation::RELEASES
+} else {
+    "https://github.com/michaelshimeles/bible-rs/releases"
+};
 
 /// Starts Sparkle, which checks for updates once a day without asking first
 /// (`SUEnableAutomaticChecks`) and offers to install a new release, and moves a copy of the app

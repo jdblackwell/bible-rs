@@ -23,6 +23,9 @@ pub struct State {
 
 impl State {
     pub fn show(&mut self, ui: &mut Ui, content: Rect, env: &PageEnv<'_>, actions: &mut Vec<Action>) -> f32 {
+        if ui.ctx().content_rect().width() < 900.0 || ui.input(|i| i.has_touch_screen()) {
+            return self.phone(ui, content, env, actions);
+        }
         let p = env.settings.theme.palette();
         let painter = ui.painter().clone();
         let (left, right, top) = (content.left(), content.right(), content.top());
@@ -151,6 +154,53 @@ impl State {
             y += h;
         }
         y
+    }
+
+    fn phone(&mut self, ui: &mut Ui, content: Rect, env: &PageEnv<'_>, actions: &mut Vec<Action>) -> f32 {
+        let t = super::reading_text(env);
+        let mut child = ui.new_child(
+            eframe::egui::UiBuilder::new().max_rect(content.with_max_y(content.top() + 100_000.0)),
+        );
+        child.style_mut().interaction.selectable_labels = false;
+        child.spacing_mut().interact_size.y = 44.0;
+        child.heading("Bookmarks");
+        let mut bookmarks = env.study.bookmarks();
+        child.label(format!("{} bookmarked verses", bookmarks.len()));
+        child.horizontal_wrapped(|ui| {
+            ui.selectable_value(&mut self.recent, false, "Canonical");
+            ui.selectable_value(&mut self.recent, true, "Recent");
+            if ui.button("Export").clicked() {
+                actions.push(Action::Export(ExportKind::Markdown));
+            }
+        });
+        if self.recent {
+            bookmarks.sort_by_key(|(v, b)| (std::cmp::Reverse(b.created), *v));
+        }
+        if bookmarks.is_empty() {
+            child.label("Select a verse in the reader and choose Bookmark to save it here.");
+            if child.button("Open John 1").clicked() {
+                open(VerseRef::new(bible_core::BookId(42), 1, 1), actions);
+            }
+        }
+        let query = env.query.trim().to_lowercase();
+        for (verse, _) in bookmarks {
+            let text = t.as_ref().and_then(|t| t.find(verse)).map(|v| v.plain_text()).unwrap_or_default();
+            if !query.is_empty() && !format!("{} {text}", verse.display()).to_lowercase().contains(&query) {
+                continue;
+            }
+            child.separator();
+            child.label(eframe::egui::RichText::new(verse.display()).strong());
+            child.label(text);
+            child.horizontal_wrapped(|ui| {
+                if ui.button(format!("Open {}", verse.display())).clicked() {
+                    open(verse, actions);
+                }
+                if ui.button(format!("Remove {}", verse.display())).clicked() {
+                    actions.push(Action::RemoveBookmark(verse));
+                }
+            });
+        }
+        child.cursor().top()
     }
 }
 

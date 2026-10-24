@@ -630,6 +630,14 @@ impl BibleApp {
     }
 
     fn apply(&mut self, ctx: &egui::Context, actions: Vec<Action>) {
+        // Finish a debounced note edit before navigation, exporting, or another action.
+        if !actions.is_empty() && self.pages.page == crate::pages::Page::Notes {
+            let mut pending = Vec::new();
+            self.pages.notes.flush(&mut pending);
+            for action in pending {
+                self.apply_one(ctx, action);
+            }
+        }
         for a in actions {
             self.apply_one(ctx, a);
         }
@@ -847,6 +855,8 @@ impl BibleApp {
                     }
                 }
             }
+            Action::SelectVerseRange => self.reader.begin_verse_range(),
+            Action::SelectWords => self.reader.begin_word_selection(),
             Action::OpenVerseMenu(pos) => {
                 if !self.reader.selected_refs().is_empty() {
                     self.verse_menu = Some(crate::verse_menu::VerseMenu::new(pos));
@@ -1331,6 +1341,10 @@ impl BibleApp {
         let changed = target != self.sidebar_motion.target();
         let instant = changed
             && (self.settings.reduce_motion
+                // Phone content is hidden while the sidebar is open. Resizing that
+                // hidden page through a long slide only delays access to its controls.
+                || ctx.content_rect().width() < 900.0
+                || ctx.input(|i| i.has_touch_screen())
                 || crate::offscreen_still()
                 || crate::motion::system_reduces_motion());
         if changed && !instant {
@@ -2530,6 +2544,22 @@ impl eframe::App for BibleApp {
         egui::CentralPanel::default().frame(Frame::NONE.fill(p.paper)).show(ui, |ui| {
             let full = ui.max_rect();
             self.main_area = full;
+            // On phones the narrow strip beside the sidebar is a dismissal target,
+            // not an interactive, squeezed version of the selected page.
+            if self.settings.sidebar_open
+                && (ctx.content_rect().width() < 900.0 || ctx.input(|i| i.has_touch_screen()))
+            {
+                let content = egui::Rect::from_min_max(
+                    egui::pos2(full.left(), full.top() + self.chrome.height),
+                    full.max,
+                );
+                let dismiss = ui.interact(content, Id::new("dismiss-phone-sidebar"), egui::Sense::click());
+                if dismiss.clicked() {
+                    actions.push(Action::ToggleSidebar);
+                }
+                self.toolbar(ui, full, 0.0, &mut actions);
+                return;
+            }
             // A page in the reader's place, under the same toolbar.
             if !self.pages.reader() {
                 let query = self.pages.query.clone();
@@ -2772,6 +2802,16 @@ impl eframe::App for BibleApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        let mut pending = Vec::new();
+        self.pages.notes.flush(&mut pending);
+        for action in pending {
+            if let Action::SaveNote(v, body) = action {
+                let _ = self.study.set_note(v, &body);
+            }
+        }
+        if let Some(note) = &mut self.note_popover {
+            note.save(&mut self.study, &mut Vec::new());
+        }
         self.reading.finish(&mut self.study);
         self.settings.chapter = self.reader.location.0.0;
         self.settings.verse = self.reader.location.1;

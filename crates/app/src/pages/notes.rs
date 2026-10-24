@@ -26,6 +26,7 @@ const LINE: f32 = 24.0;
 
 pub struct State {
     recent: bool,
+    phone_editor: bool,
     selected: Option<VerseRef>,
     editor: Option<Editor>,
     /// The new-note and link-verse popups' reference fields.
@@ -35,7 +36,14 @@ pub struct State {
 
 impl Default for State {
     fn default() -> Self {
-        Self { recent: true, selected: None, editor: None, adding: String::new(), linking: String::new() }
+        Self {
+            recent: true,
+            phone_editor: false,
+            selected: None,
+            editor: None,
+            adding: String::new(),
+            linking: String::new(),
+        }
     }
 }
 
@@ -174,6 +182,10 @@ impl State {
             self.editor = Some(Editor::new(v, &body));
         }
 
+        if ui.ctx().content_rect().width() < 900.0 || ui.input(|i| i.has_touch_screen()) {
+            self.phone(ui, area, env, actions);
+            return;
+        }
         let list = Rect::from_min_max(area.min, pos2(area.left() + LIST_W, area.bottom()));
         let editor = Rect::from_min_max(pos2(list.right(), area.top()), area.max);
         self.list(ui, p, list, env, t.as_deref(), actions);
@@ -197,8 +209,151 @@ impl State {
         }
     }
 
+    /// Phones show either the list or a full-width editor.
+    fn phone(&mut self, ui: &mut Ui, area: Rect, env: &PageEnv<'_>, actions: &mut Vec<Action>) {
+        let translation = super::reading_text(env);
+        let verse_preview =
+            |v| translation.as_ref().and_then(|t| t.find(v)).map(|v| v.plain_text()).unwrap_or_default();
+        let body = Rect::from_min_max(
+            pos2(area.left() + 12.0, area.top() + env.toolbar + 8.0),
+            pos2(area.right() - 12.0, area.bottom()),
+        );
+        let mut child = ui.new_child(egui::UiBuilder::new().max_rect(body));
+        child.set_clip_rect(body.intersect(ui.clip_rect()));
+        child.style_mut().interaction.selectable_labels = false;
+        child.spacing_mut().interact_size.y = 44.0;
+        if self.phone_editor {
+            if child.button("Back to notes").clicked() {
+                self.flush(actions);
+                self.phone_editor = false;
+                return;
+            }
+            if let Some(v) = self.editor.as_ref().map(|e| e.verse)
+                && child.button(format!("Open {} in reader", v.display())).clicked()
+            {
+                self.flush(actions);
+                actions.push(Action::Jump { chapter: v.chapter_idx(), verse: Some(v.verse), flash: true });
+                return;
+            }
+            if let Some(e) = &mut self.editor {
+                child.heading(e.verse.display());
+                if child.button("Delete note").clicked() {
+                    actions.push(Action::RemoveNote(e.verse));
+                    self.editor = None;
+                    self.selected = None;
+                    self.phone_editor = false;
+                    return;
+                }
+            }
+            if let Some(e) = &mut self.editor {
+                egui::ScrollArea::vertical().id_salt("phone-note-text").auto_shrink(false).show(
+                    &mut child,
+                    |ui| {
+                        let preview = verse_preview(e.verse);
+                        if !preview.is_empty() {
+                            ui.label(egui::RichText::new(&preview).italics());
+                            for highlight in
+                                env.study.highlight_parts(e.verse).iter().filter(|h| !h.is_whole())
+                            {
+                                ui.label(format!("Highlighted words: {}", highlight.excerpt(&preview)));
+                            }
+                            ui.separator();
+                        }
+                        let response = ui.add(
+                            egui::TextEdit::multiline(&mut e.text)
+                                .id_salt(("phone-note", e.verse.key()))
+                                .hint_text("Write a note…")
+                                .desired_width(ui.available_width())
+                                .desired_rows(12),
+                        );
+                        if response.changed() {
+                            e.changed = Some(ui.input(|i| i.time));
+                        }
+                        let linked = mentioned(&e.text);
+                        if !linked.is_empty() {
+                            ui.separator();
+                            ui.label("Verses mentioned in this note");
+                            for v in linked {
+                                if ui.button(format!("Open {} in reader", v.display())).clicked() {
+                                    actions.push(Action::Jump {
+                                        chapter: v.chapter_idx(),
+                                        verse: Some(v.verse),
+                                        flash: true,
+                                    });
+                                }
+                            }
+                        }
+                    },
+                );
+            }
+            if self
+                .editor
+                .as_ref()
+                .and_then(|e| e.changed)
+                .is_some_and(|at| ui.input(|i| i.time) - at >= 0.35)
+            {
+                self.flush(actions);
+            } else if self.editor.as_ref().is_some_and(|e| e.changed.is_some()) {
+                ui.ctx().request_repaint_after(std::time::Duration::from_millis(350));
+            }
+        } else {
+            child.heading("Notes");
+            child.horizontal(|ui| {
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.adding)
+                        .hint_text("Verse, e.g. John 3:16")
+                        .desired_width((body.width() - 80.0).max(80.0)),
+                );
+                if ui.button("Add").clicked() {
+                    if let Some(r) = bible_core::reference::parse(&self.adding).filter(|r| r.verse.is_some())
+                    {
+                        self.flush(actions);
+                        let v = r.verse_ref();
+                        self.selected = Some(v);
+                        let text = env.study.note(v).map(|n| n.body.as_str()).unwrap_or("");
+                        self.editor = Some(Editor::new(v, text));
+                        self.phone_editor = true;
+                        self.adding.clear();
+                    } else {
+                        actions.push(Action::Toast("Enter a verse such as John 3:16".into()));
+                    }
+                }
+            });
+            let mut notes = env.study.notes();
+            notes.sort_by_key(|(v, n)| (std::cmp::Reverse(n.updated), *v));
+            egui::ScrollArea::vertical()
+                .id_salt("phone-notes-list")
+                .scroll_source(egui::scroll_area::ScrollSource {
+                    drag: egui::scroll_area::DragScroll::Always,
+                    ..Default::default()
+                })
+                .auto_shrink(false)
+                .show(&mut child, |ui| {
+                    for (v, note) in notes {
+                        if !env.query.is_empty()
+                            && !format!("{} {}", v.display(), note.body)
+                                .to_lowercase()
+                                .contains(&env.query.to_lowercase())
+                        {
+                            continue;
+                        }
+                        let label = format!("{}\n{}\n{}", v.display(), verse_preview(v), plain(&note.body));
+                        if ui
+                            .add_sized([ui.available_width(), 112.0], egui::Button::new(label).wrap())
+                            .clicked()
+                        {
+                            self.flush(actions);
+                            self.selected = Some(v);
+                            self.editor = Some(Editor::new(v, &note.body));
+                            self.phone_editor = true;
+                        }
+                    }
+                });
+        }
+    }
+
     /// Saves the open note if it changed.
-    fn flush(&mut self, actions: &mut Vec<Action>) {
+    pub(crate) fn flush(&mut self, actions: &mut Vec<Action>) {
         if let Some(e) = &mut self.editor {
             let md = to_markdown(&e.text);
             if md != e.saved {
