@@ -1,0 +1,5 @@
+{"scene":"reader_idle","samples":120,"mean_ms":0.034,"p50_ms":0.027,"p95_ms":0.037,"max_ms":0.168,"chapter_layouts":0,"study_mutations":0}
+{"scene":"reader_scroll","samples":240,"mean_ms":0.032,"p50_ms":0.026,"p95_ms":0.046,"max_ms":0.230,"chapter_layouts":0,"study_mutations":0}
+{"scene":"sidebar_toggle","samples":240,"mean_ms":0.193,"p50_ms":0.187,"p95_ms":0.293,"max_ms":3.822,"chapter_layouts":0,"study_mutations":0}
+{"scene":"bookmarks","samples":120,"mean_ms":0.043,"p50_ms":0.045,"p95_ms":0.046,"max_ms":0.077,"chapter_layouts":0,"study_mutations":0}
+{"scene":"note_typing","samples":80,"mean_ms":0.053,"p50_ms":0.052,"p95_ms":0.093,"max_ms":0.109,"chapter_layouts":0,"study_mutations":0}

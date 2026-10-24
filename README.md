@@ -1,4 +1,29 @@
-# bible-rs
+# Bible for Omalauncher — based on bible-rs
+
+An independent community adaptation of [bible-rs by Micky and contributors](https://github.com/michaelshimeles/bible-rs),
+starting from [ForrestKnight's fork](https://github.com/ForrestKnight/bible-rs).
+Omalauncher integration, adaptation and testing: **Javahax**.
+Original code copyright © 2026 Micky; the original [MIT license](LICENSE) is retained.
+See [full credits and other licenses](CREDITS.md).
+
+This preview runs the Rust application inside **Omalauncher's ARM64 Arch environment**,
+with an optional OWL widget. It is not a standalone Android APK and does not imply
+upstream endorsement. Phone improvements cover setup, touch scrolling/selection,
+settings, notes, bookmarks and responsiveness.
+
+- [Install/build, backup and uninstall](launcher/INSTALL.md)
+- [Preview changes and known limitations](launcher/CHANGELOG.md)
+- [Performance measurements](launcher/performance/REPORT.md)
+
+Preview release preparation is in progress. Targeted device checks have passed;
+a second-device test and the full upstream CI matrix are still outstanding.
+The tested base is recorded in CREDITS.md; newer upstream changes are not yet merged.
+
+## Original bible-rs documentation
+
+The following describes upstream's platforms and services. Official upstream
+links and release instructions refer to the original project, not this community
+preview; use the installation guide above for Omalauncher.
 
 Bible: a very fast, native Bible reader for the Mac, written in Rust. Just the Bible — beautifully
 typeset, searchable as you type, with highlights, notes and bookmarks kept on your computer. The

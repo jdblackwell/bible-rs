@@ -1,0 +1,1 @@
+{"toggles":8,"frames_per_toggle":[7, 8, 3, 8, 3, 7, 3, 7],"chapter_layouts_per_toggle":[0, 0, 0, 0, 0, 0, 0, 0],"ui_ms":{"mean":0.615,"p50":0.302,"p95":1.904,"p99":6.133,"max":6.133},"frame_interval_ms":{"mean":27.008,"p50":26.375,"p95":36.746,"max":41.962},"long_intervals":2,"idle_frames":8}

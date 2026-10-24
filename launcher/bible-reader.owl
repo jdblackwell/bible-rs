@@ -1,0 +1,132 @@
+// Community adaptation: Javahax. Original: Micky and bible-rs contributors.
+// Render @BIN_DIR@ with install.sh; do not copy this template directly into widgets.
+widget "Bible reader" {
+  meta { owl: 11; description: "Bible for Omalauncher, based on bible-rs by Micky and contributors. Adaptation: Javahax."; version: "0.2.0-preview.1"; license: "MIT"; category: "books" }
+  size: 6x3
+  minSize: 3x3
+
+  state reference = "John 3:16" persist
+  state translation = "web" persist
+  state bookmarks = [] persist
+  state tab = "read"
+  state query = ""
+  state fontSize = 19 persist
+  source passage = cmd("'@BIN_DIR@/bible-widget' read ${sh(translation)} ${sh(reference)}") every 1h json
+  source matches = cmd("'@BIN_DIR@/bible-widget' search ${sh(translation)} ${sh(query)}") every 1h json
+  let translations = ["kjv", "web", "bsb", "asv", "ylt", "dby", "wbs"]
+  let saved = any(bookmarks, b => b.ref == reference && b.translation == translation)
+  let citation = "${passage.ref ?? reference} (${upper(translation)})"
+  let copied = "${passage.preview ?? ""} — ${citation}"
+  let previewLines = max(2, floor((tileHeight - 74) / 21))
+
+  onTap: { tab = "read"; screen() }
+  Column {
+    gap: 6
+    Row {
+      Text { text: "BIBLE · OFFLINE"; style: label; color: muted; weight: 1 }
+      Text { text: upper(translation); style: label; color: accent }
+    }
+    Text { text: passage.error ?? passage.preview ?? "Loading Bible…"; font: serif; fontSize: 17; maxLines: previewLines; weight: 1 }
+    Row {
+      Text { text: passage.ref ?? reference; style: label; color: accent; weight: 1 }
+      Text { text: "read & search →"; style: small; color: muted }
+    }
+  }
+
+  screen {
+    title: "Bible · ${upper(translation)}"
+    Column {
+      fill: true
+      gap: 8
+      Input { text: reference; placeholder: "Passage, e.g. John 3:16 or Psalm 23"; onSubmit: { reference = trim(value); tab = "read" } }
+      Flow {
+        gap: 4
+        for t in translations {
+          Button { text: upper(t); color: translation == t ? accent : muted; onTap: translation = t }
+        }
+      }
+      Row {
+        gap: 8
+        Button { text: "Read"; color: tab == "read" ? accent : muted; onTap: tab = "read" }
+        Button { text: "Search"; color: tab == "search" ? accent : muted; onTap: tab = "search" }
+        Button { text: "Saved · ${len(bookmarks)}"; color: tab == "saved" ? accent : muted; onTap: tab = "saved" }
+      }
+
+      if tab == "read" {
+        if passage.error != null {
+          Text { text: passage.error; color: red; maxLines: 6 }
+        } else {
+          Row {
+            Button { text: "←"; onTap: { if passage.previous != null { reference = passage.previous } } }
+            Text { text: passage.chapter ?? "Loading…"; weight: 1; align: center; bold: true }
+            Button { text: "→"; onTap: { if passage.next != null { reference = passage.next } } }
+          }
+          Row {
+            gap: 6
+            Button { text: saved ? "★ Saved" : "☆ Save"; onTap: {
+              if saved { bookmarks = filter(bookmarks, b => b.ref != reference || b.translation != translation) }
+              else { bookmarks = ([{ref: reference, translation: translation}] + bookmarks).take(100) }
+            } }
+            Button { text: "Copy"; onTap: copy(copied) }
+            Button { text: "Share"; onTap: share(copied) }
+            Button { text: "A−"; onTap: fontSize = max(14, fontSize - 1) }
+            Button { text: "A+"; onTap: fontSize = min(28, fontSize + 1) }
+          }
+          Column {
+            weight: 1
+            lazy: true
+            gap: 14
+            if contains(reference, ":") {
+              Column {
+                padding: 12
+                background: alpha(accent, 0.08)
+                Text { text: citation; style: small; color: accent }
+                Text { text: passage.preview ?? "…"; font: serif; fontSize: fontSize; maxLines: 100 }
+              }
+              Text { text: "FULL CHAPTER · hold a verse to copy"; style: label; color: muted }
+            }
+            for v in passage.verses ?? [] key v.ref {
+              Row {
+                align: top
+                padding: [4, 2]
+                Text { text: str(v.number); width: 30; color: accent; fontSize: 13 }
+                Text { text: v.text; weight: 1; font: serif; fontSize: fontSize; color: v.selected ? accent : foreground; maxLines: 80; onLongPress: { copy("${v.text} — ${v.ref} (${upper(translation)})"); haptic() } }
+              }
+            }
+          }
+        }
+      } else if tab == "search" {
+        Input { text: query; placeholder: "Search words or an exact phrase in quotes"; onSubmit: query = trim(value) }
+        Text { text: query == "" ? "Enter words above to search the whole Bible." : matches.error ?? "${matches.total ?? 0} matches · showing up to 60"; style: small; color: muted; maxLines: 3 }
+        Column {
+          weight: 1
+          lazy: true
+          gap: 12
+          for result in matches.results ?? [] key result.ref {
+            Column {
+              padding: 8
+              onTap: { reference = result.ref; tab = "read" }
+              Text { text: result.ref; color: accent; bold: true }
+              Text { text: result.text; font: serif; fontSize: fontSize; maxLines: 12 }
+            }
+          }
+        }
+      } else {
+        Text { text: len(bookmarks) == 0 ? "Save a passage while reading to find it here." : "Tap a saved passage to read it."; style: small; color: muted; maxLines: 3 }
+        Column {
+          weight: 1
+          lazy: true
+          gap: 8
+          for b, i in bookmarks {
+            Row {
+              Text { text: "${b.ref} · ${upper(b.translation)}"; weight: 1; padding: 10; onTap: { reference = b.ref; translation = b.translation; tab = "read" } }
+              Button { text: "×"; onTap: bookmarks = remove(bookmarks, i) }
+            }
+          }
+        }
+      }
+      Text { text: "Based on bible-rs by Micky and contributors · Omalauncher adaptation: Javahax"; style: small; color: muted; maxLines: 3 }
+      Button { text: "Open Bible for Omalauncher"; onTap: app("@BIN_DIR@/bible-rs") }
+    }
+  }
+}

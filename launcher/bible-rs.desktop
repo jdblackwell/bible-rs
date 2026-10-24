@@ -1,0 +1,10 @@
+# Template; install.sh generates the entry using the actual installation paths.
+[Desktop Entry]
+Type=Application
+Name=Bible for Omalauncher
+Comment=Based on bible-rs by Micky and contributors; adaptation by Javahax
+Exec="@BIN_DIR@/bible-rs"
+Icon=@ICON_PATH@
+Terminal=false
+Categories=Education;
+StartupWMClass=bible-rs

@@ -27,6 +27,7 @@ permissions:
 
 jobs:
   macos:
+    if: github.repository == 'michaelshimeles/bible-rs'
     name: Universal app, DMG and zip (signed, notarized)
     runs-on: macos-latest
     timeout-minutes: 60
@@ -147,6 +148,7 @@ jobs:
 
   # The Windows installer, as a workflow artifact. It never touches the GitHub Release.
   windows:
+    if: github.repository == 'michaelshimeles/bible-rs'
     name: Windows installer (artifact only)
     runs-on: windows-latest
     timeout-minutes: 60
